@@ -20,6 +20,12 @@ namespace Nuclear.EditorTools
         [MenuItem("Nuclear/Включить URP (постобработка)")]
         public static void EnableUrp()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                EditorUtility.DisplayDialog("Nuclear", "Сначала остановите игру (кнопка Play), потом включайте URP.", "OK");
+                return;
+            }
+
             if (!UrpSetupAvailable)
             {
                 Client.Add("com.unity.render-pipelines.universal");

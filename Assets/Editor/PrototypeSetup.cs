@@ -42,6 +42,13 @@ namespace Nuclear.EditorTools
         [MenuItem("Nuclear/Собрать сцену прототипа")]
         public static void Build()
         {
+            // Во время игры Unity не даёт сохранять сцены и ассеты — сборка упадёт на полпути.
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                EditorUtility.DisplayDialog("Nuclear", "Сначала остановите игру (кнопка Play), потом соберите сцену.", "OK");
+                return;
+            }
+
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return;
 
