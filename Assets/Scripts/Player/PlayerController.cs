@@ -1,0 +1,153 @@
+using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+namespace Nuclear.Player
+{
+    /// <summary>
+    /// Игрок от первого лица: ходьба, бег, прыжок, обзор мышью.
+    /// Движение считает только владелец; позицию раздаёт OwnerNetworkTransform.
+    /// </summary>
+    [RequireComponent(typeof(CharacterController), typeof(PlayerStamina))]
+    public class PlayerController : NetworkBehaviour
+    {
+        [Header("Движение")]
+        [SerializeField] private float walkSpeed = 4f;
+        [SerializeField] private float sprintSpeed = 7f;
+        [SerializeField] private float acceleration = 12f;
+        [SerializeField] private float jumpHeight = 1.1f;
+        [SerializeField] private float jumpStaminaCost = 15f;
+        [SerializeField] private float gravity = -20f;
+
+        [Header("Обзор")]
+        [SerializeField] private float mouseSensitivity = 0.1f;
+        [SerializeField] private float maxPitch = 85f;
+
+        /// <summary>Бежит ли игрок. Видно всем: пригодится для анимаций и шума для Слепыша.</summary>
+        public readonly NetworkVariable<bool> IsSprinting = new(
+            false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+        public PlayerStamina Stamina { get; private set; }
+
+        private CharacterController controller;
+        private Transform cameraRoot;
+        private Vector3 horizontalVelocity;
+        private float verticalVelocity;
+        private float pitch;
+
+        private void Awake()
+        {
+            controller = GetComponent<CharacterController>();
+            Stamina = GetComponent<PlayerStamina>();
+
+            var playerCamera = GetComponentInChildren<Camera>(true);
+            cameraRoot = playerCamera.transform;
+        }
+
+        public override void OnNetworkSpawn()
+        {
+            var playerCamera = cameraRoot.GetComponent<Camera>();
+            var listener = cameraRoot.GetComponent<AudioListener>();
+
+            // Камера и слух только у своего игрока, иначе в сцене будет несколько камер.
+            playerCamera.enabled = IsOwner;
+            if (listener != null)
+                listener.enabled = IsOwner;
+
+            if (!IsOwner)
+                return;
+
+            // Своё тело не рисуем, чтобы капсула не мешала обзору.
+            foreach (var bodyRenderer in GetComponentsInChildren<Renderer>())
+                bodyRenderer.enabled = false;
+
+            // Разводим игроков по кругу, чтобы они не появлялись друг в друге.
+            float angle = OwnerClientId * 90f * Mathf.Deg2Rad;
+            Teleport(new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 2f + Vector3.up * 0.1f);
+
+            SetCursorLocked(true);
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            if (IsOwner)
+                SetCursorLocked(false);
+        }
+
+        private void Update()
+        {
+            if (!IsSpawned || !IsOwner)
+                return;
+
+            var keyboard = Keyboard.current;
+            var mouse = Mouse.current;
+            if (keyboard == null || mouse == null)
+                return;
+
+            if (keyboard.escapeKey.wasPressedThisFrame)
+                SetCursorLocked(false);
+            else if (mouse.leftButton.wasPressedThisFrame && Cursor.lockState != CursorLockMode.Locked)
+                SetCursorLocked(true);
+
+            if (Cursor.lockState == CursorLockMode.Locked)
+                Look(mouse.delta.ReadValue());
+
+            Move(keyboard, Time.deltaTime);
+        }
+
+        private void Look(Vector2 delta)
+        {
+            transform.Rotate(Vector3.up, delta.x * mouseSensitivity);
+            pitch = Mathf.Clamp(pitch - delta.y * mouseSensitivity, -maxPitch, maxPitch);
+            cameraRoot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+        }
+
+        private void Move(Keyboard keyboard, float deltaTime)
+        {
+            var input = new Vector2(
+                (keyboard.dKey.isPressed ? 1f : 0f) - (keyboard.aKey.isPressed ? 1f : 0f),
+                (keyboard.wKey.isPressed ? 1f : 0f) - (keyboard.sKey.isPressed ? 1f : 0f));
+            input = Vector2.ClampMagnitude(input, 1f);
+
+            bool grounded = controller.isGrounded;
+            bool wantsSprint = keyboard.leftShiftKey.isPressed && input.y > 0f;
+            bool sprinting = wantsSprint && grounded && Stamina.CanSprint;
+
+            if (sprinting)
+                Stamina.DrainSprint(deltaTime);
+            else
+                Stamina.Tick(deltaTime);
+
+            if (IsSprinting.Value != sprinting)
+                IsSprinting.Value = sprinting;
+
+            float speed = sprinting ? sprintSpeed : walkSpeed;
+            Vector3 target = (transform.right * input.x + transform.forward * input.y) * speed;
+            horizontalVelocity = Vector3.MoveTowards(horizontalVelocity, target, acceleration * speed * deltaTime);
+
+            if (grounded && verticalVelocity < 0f)
+                verticalVelocity = -2f; // Прижимаем к земле, чтобы isGrounded не мигал на склонах.
+
+            if (grounded && keyboard.spaceKey.wasPressedThisFrame && Stamina.TrySpend(jumpStaminaCost))
+                verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+
+            verticalVelocity += gravity * deltaTime;
+
+            controller.Move((horizontalVelocity + Vector3.up * verticalVelocity) * deltaTime);
+        }
+
+        private void Teleport(Vector3 position)
+        {
+            // CharacterController перезаписывает позицию, пока включён.
+            controller.enabled = false;
+            transform.position = position;
+            controller.enabled = true;
+        }
+
+        private static void SetCursorLocked(bool locked)
+        {
+            Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+            Cursor.visible = !locked;
+        }
+    }
+}
