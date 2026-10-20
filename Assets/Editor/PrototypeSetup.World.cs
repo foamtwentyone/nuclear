@@ -4,6 +4,7 @@ using Nuclear.Hazards;
 using Nuclear.Items;
 using Nuclear.Level;
 using Nuclear.Network;
+using Nuclear.Visuals;
 using Nuclear.World;
 using Unity.AI.Navigation;
 using Unity.Netcode;
@@ -45,6 +46,8 @@ namespace Nuclear.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             BuildLighting();
+            if (UsingUrp)
+                CallUrp("AddPostProcessing");
 
             // Камера-заглушка, пока игрок не заспавнился: вид на шлюз со стороны дороги.
             var menuCamera = new GameObject("Menu Camera").AddComponent<Camera>();
@@ -53,6 +56,7 @@ namespace Nuclear.EditorTools
             menuCamera.farClipPlane = 120f;
             menuCamera.transform.SetPositionAndRotation(new Vector3(-9f, 4.5f, 17f), Quaternion.Euler(14f, 150f, 0f));
             menuCamera.depth = -10f;
+            ConfigureCameraForPipeline(menuCamera);
 
             var networkObject = new GameObject("NetworkManager");
             var manager = networkObject.AddComponent<NetworkManager>();
@@ -98,29 +102,36 @@ namespace Nuclear.EditorTools
             });
         }
 
-        /// <summary>Пасмурный свет сквозь пепел: низкое тусклое солнце, тёплая серая дымка.</summary>
+        /// <summary>
+        /// Свет сквозь пепельную дымку: низкое тёплое солнце и прохладная заливка из тени.
+        /// Контраст тёплого и холодного делает картинку объёмной, а не просто серой.
+        /// </summary>
         private static void BuildLighting()
         {
             var sun = new GameObject("Sun").AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.color = new Color(0.86f, 0.8f, 0.72f);
-            sun.intensity = 0.85f;
+            sun.color = new Color(1f, 0.87f, 0.7f);
+            sun.intensity = 1.05f;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.75f;
-            sun.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
+            sun.shadowStrength = 0.8f;
+            sun.transform.rotation = Quaternion.Euler(32f, -35f, 0f);
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.42f, 0.42f, 0.44f);
-            RenderSettings.ambientEquatorColor = new Color(0.36f, 0.34f, 0.32f);
-            RenderSettings.ambientGroundColor = new Color(0.2f, 0.19f, 0.18f);
+            RenderSettings.ambientSkyColor = new Color(0.44f, 0.47f, 0.53f);
+            RenderSettings.ambientEquatorColor = new Color(0.42f, 0.4f, 0.37f);
+            RenderSettings.ambientGroundColor = new Color(0.22f, 0.2f, 0.18f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Exponential;
-            RenderSettings.fogDensity = 0.03f;
+            RenderSettings.fogDensity = 0.025f;
             RenderSettings.fogColor = FogColor;
             RenderSettings.sun = sun;
 
+            // Сглаживание краёв (на low-poly «лесенка» особенно заметна) и чёткие тени.
+            QualitySettings.antiAliasing = 4;
             QualitySettings.shadowDistance = 60f;
+            QualitySettings.shadowResolution = ShadowResolution.VeryHigh;
+            QualitySettings.shadowCascades = 2;
         }
 
         private static void BuildWorld(Transform level)
@@ -143,6 +154,7 @@ namespace Nuclear.EditorTools
             BuildPoles(level);
             BuildFences(level);
             BuildHazardProps(level);
+            BuildFireBarrels(level);
             BuildTrees(level);
             BuildScatter(level);
             BuildBoundary(level);
@@ -188,7 +200,7 @@ namespace Nuclear.EditorTools
         private static void BuildGround(Transform level)
         {
             const float extent = 60f;
-            const float cell = 1.5f;
+            const float cell = 1.25f;
             int cells = Mathf.RoundToInt(extent * 2f / cell);
             var random = new System.Random(1);
             var kit = new MeshKit();
@@ -600,6 +612,110 @@ namespace Nuclear.EditorTools
             blockedCircles.Add(new Vector3(WeakSpotCenter.x, WeakSpotCenter.y, 3f));
         }
 
+        /// <summary>
+        /// Бочки с огнём: тёплые островки света в сером мире и ориентиры (у выхода из Бункера-7 и у Бункера-12).
+        /// </summary>
+        private static void BuildFireBarrels(Transform level)
+        {
+            var random = new System.Random(15);
+            var ember = SaveMaterial("Ember", new Color(1f, 0.45f, 0.15f), emission: new Color(2.4f, 0.9f, 0.25f));
+            foreach (var spot in new[] { new Vector2(-4.6f, 6.4f), new Vector2(4.9f, 21.3f) })
+            {
+                var position = OnGround(spot.x, spot.y);
+                var kit = new MeshKit();
+                Models.Barrel(kit, random, hazard: false);
+                kit.AddCollider(new Vector3(0f, 0.44f, 0f), new Vector3(0.6f, 0.88f, 0.6f), Quaternion.identity);
+                var barrel = AddModel(level, "Fire Barrel", kit, position, Quaternion.Euler(0f, Range(random, 0f, 360f), 0f));
+                MarkStatic(barrel);
+
+                var coalsKit = new MeshKit();
+                Models.GlowShards(coalsKit, random, new Vector3(0f, 0.86f, 0f), 7, 0.15f);
+                AddModel(barrel.transform, "Coals", coalsKit, Vector3.zero, Quaternion.identity, ember, scale: 0.6f).transform.localPosition = new Vector3(0f, 0.35f, 0f);
+
+                AddFire(barrel.transform, new Vector3(0f, 0.95f, 0f));
+
+                var light = new GameObject("Fire Light").AddComponent<Light>();
+                light.transform.SetParent(barrel.transform, false);
+                light.transform.localPosition = new Vector3(0f, 1.4f, 0f);
+                light.type = LightType.Point;
+                light.color = new Color(1f, 0.6f, 0.3f);
+                light.intensity = 2.2f;
+                light.range = 9f;
+                light.shadows = LightShadows.Soft;
+                light.gameObject.AddComponent<LightFlicker>();
+
+                blockedCircles.Add(new Vector3(spot.x, spot.y, 1.5f));
+            }
+        }
+
+        /// <summary>Пламя (яркие язычки, тают к верху) и дым над ним.</summary>
+        private static void AddFire(Transform parent, Vector3 position)
+        {
+            var flames = NewParticles(parent, "Flames", position);
+            var main = flames.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 0.8f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.6f, 1.3f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.35f);
+            main.startColor = new Color(1f, 0.75f, 0.3f, 0.9f);
+            var emission = flames.emission;
+            emission.rateOverTime = 30f;
+            var shape = flames.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 8f;
+            shape.radius = 0.18f;
+            shape.rotation = new Vector3(-90f, 0f, 0f);
+            var size = flames.sizeOverLifetime;
+            size.enabled = true;
+            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.2f));
+            var color = flames.colorOverLifetime;
+            color.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[] { new GradientColorKey(new Color(1f, 0.85f, 0.4f), 0f), new GradientColorKey(new Color(1f, 0.4f, 0.1f), 0.5f), new GradientColorKey(new Color(0.4f, 0.1f, 0.05f), 1f) },
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.9f, 0.15f), new GradientAlphaKey(0f, 1f) });
+            color.color = gradient;
+
+            var smoke = NewParticles(parent, "Smoke", position + Vector3.up * 0.4f);
+            var smokeMain = smoke.main;
+            smokeMain.startLifetime = new ParticleSystem.MinMaxCurve(3f, 5f);
+            smokeMain.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 0.8f);
+            smokeMain.startSize = new ParticleSystem.MinMaxCurve(0.4f, 0.7f);
+            smokeMain.startColor = new Color(0.25f, 0.24f, 0.23f, 0.35f);
+            var smokeEmission = smoke.emission;
+            smokeEmission.rateOverTime = 5f;
+            var smokeShape = smoke.shape;
+            smokeShape.shapeType = ParticleSystemShapeType.Cone;
+            smokeShape.angle = 12f;
+            smokeShape.radius = 0.2f;
+            smokeShape.rotation = new Vector3(-90f, 0f, 0f);
+            var smokeSize = smoke.sizeOverLifetime;
+            smokeSize.enabled = true;
+            smokeSize.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 2.5f));
+            var smokeColor = smoke.colorOverLifetime;
+            smokeColor.enabled = true;
+            var fade = new Gradient();
+            fade.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(0f, 1f) });
+            smokeColor.color = fade;
+        }
+
+        private static ParticleSystem NewParticles(Transform parent, string name, Vector3 position)
+        {
+            var holder = new GameObject(name);
+            holder.transform.SetParent(parent, false);
+            holder.transform.localPosition = position;
+            var particles = holder.AddComponent<ParticleSystem>();
+            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = particles.main;
+            main.loop = true;
+            main.prewarm = true;
+            main.playOnAwake = true;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            holder.GetComponent<ParticleSystemRenderer>().sharedMaterial = ParticleMaterial();
+            return particles;
+        }
+
         private static void AddRadiationZone(Transform parent, string name, Vector3 position, float radius, float intensity)
         {
             var zone = new GameObject(name);
@@ -668,10 +784,16 @@ namespace Nuclear.EditorTools
             var random = new System.Random(8);
             var kit = new MeshKit();
 
-            for (int i = 0; i < 420; i++)
+            // Трава гуще там, где земля и так травяная (те же пятна шума, что в GroundSwatch): заросли, а не посыпка.
+            for (int i = 0; i < 3600; i++)
             {
-                var position = new Vector2(Range(random, -45f, 45f), Range(random, -45f, 45f));
+                // Почти вся трава в игровой зоне, немного — на склонах за ней.
+                float extent = i % 6 == 0 ? 45f : 31f;
+                var position = new Vector2(Range(random, -extent, extent), Range(random, -extent, extent));
                 if (IsInsideBuilding(position) || Mathf.Abs(position.y - RoadZ) < 3.2f)
+                    continue;
+                float patch = Mathf.PerlinNoise(position.x * 0.07f + 7f, position.y * 0.07f + 3f);
+                if (random.NextDouble() > (patch > 0.55f ? 1.0 : 0.2))
                     continue;
                 Models.GrassTuft(kit, random, OnGround(position.x, position.y));
             }

@@ -27,7 +27,7 @@ namespace Nuclear.EditorTools
         private const string NetworkPrefabsPath = PrefabFolder + "/NetworkPrefabs.asset";
 
         /// <summary>Цвет пепельной дымки: им же заливается фон камер, чтобы горизонт растворялся в тумане.</summary>
-        private static readonly Color FogColor = new(0.53f, 0.51f, 0.48f);
+        private static readonly Color FogColor = new(0.58f, 0.55f, 0.5f);
 
         private static Material lowPolyMaterial;
         private static Material glowMaterial;
@@ -112,6 +112,15 @@ namespace Nuclear.EditorTools
                 if (material.HasProperty(property))
                     material.SetFloat(property, smoothness);
             }
+
+            // Матовый вид без «пластиковых» бликов и отражений неба: свойства и ключевые слова
+            // называются одинаково во встроенном Standard и в URP Lit, кроме отражений.
+            material.SetFloat("_SpecularHighlights", 0f);
+            material.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            material.SetFloat("_GlossyReflections", 0f);
+            material.EnableKeyword("_GLOSSYREFLECTIONS_OFF");
+            material.SetFloat("_EnvironmentReflections", 0f);
+            material.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
 
             if (emission.HasValue)
             {

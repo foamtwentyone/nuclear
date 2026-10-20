@@ -1,0 +1,27 @@
+{
+    "name": "Nuclear.Editor.Urp",
+    "rootNamespace": "Nuclear.EditorTools.Urp",
+    "references": [
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "NUCLEAR_URP"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.render-pipelines.universal",
+            "expression": "",
+            "define": "NUCLEAR_URP"
+        }
+    ],
+    "noEngineReferences": false
+}

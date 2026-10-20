@@ -1,0 +1,136 @@
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
+
+namespace Nuclear.EditorTools.Urp
+{
+    /// <summary>
+    /// Настройка URP. Эта сборка компилируется, только когда пакет URP установлен
+    /// (см. Nuclear.Editor.Urp.asmdef), поэтому основное меню вызывает её через отражение.
+    /// </summary>
+    public static class UrpSetup
+    {
+        private const string Folder = "Assets/Settings";
+
+        /// <summary>Создаёт конвейер URP с затенением углов (SSAO) и сглаживанием и делает его основным.</summary>
+        public static void Install()
+        {
+            if (!AssetDatabase.IsValidFolder(Folder))
+                AssetDatabase.CreateFolder("Assets", "Settings");
+
+            string rendererPath = Folder + "/Nuclear Renderer.asset";
+            string pipelinePath = Folder + "/Nuclear URP.asset";
+            AssetDatabase.DeleteAsset(pipelinePath);
+            AssetDatabase.DeleteAsset(rendererPath);
+
+            var renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
+            AssetDatabase.CreateAsset(renderer, rendererPath);
+            AddRendererFeature<ScreenSpaceAmbientOcclusion>(renderer, "Ambient Occlusion");
+
+            var pipeline = UniversalRenderPipelineAsset.Create(renderer);
+            pipeline.msaaSampleCount = 4;
+            pipeline.shadowDistance = 60f;
+            pipeline.shadowCascadeCount = 2;
+            pipeline.supportsHDR = true;
+            AssetDatabase.CreateAsset(pipeline, pipelinePath);
+
+            GraphicsSettings.defaultRenderPipeline = pipeline;
+            // У уровней качества может быть свой конвейер: сбрасываем, чтобы везде работал наш.
+            int current = QualitySettings.GetQualityLevel();
+            for (int level = 0; level < QualitySettings.names.Length; level++)
+            {
+                QualitySettings.SetQualityLevel(level, false);
+                QualitySettings.renderPipeline = null;
+            }
+            QualitySettings.SetQualityLevel(current, false);
+
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>Камере нужна постобработка, иначе объём Volume на неё не действует.</summary>
+        public static void ConfigureCamera(Camera camera)
+        {
+            var data = camera.GetUniversalAdditionalCameraData();
+            data.renderPostProcessing = true;
+            data.antialiasing = AntialiasingMode.None;
+        }
+
+        /// <summary>
+        /// Глобальная постобработка: плёночная тональная кривая, тёплые света и холодные тени,
+        /// мягкое свечение огня и радиации, лёгкая виньетка и зерно.
+        /// </summary>
+        public static void AddPostProcessing()
+        {
+            string path = Folder + "/Post Processing.asset";
+            AssetDatabase.DeleteAsset(path);
+            var profile = ScriptableObject.CreateInstance<VolumeProfile>();
+            AssetDatabase.CreateAsset(profile, path);
+
+            var tonemapping = AddOverride<Tonemapping>(profile);
+            tonemapping.mode.Override(TonemappingMode.ACES);
+
+            var color = AddOverride<ColorAdjustments>(profile);
+            color.postExposure.Override(0.3f);
+            color.contrast.Override(14f);
+            color.saturation.Override(-8f);
+
+            AddOverride<WhiteBalance>(profile).temperature.Override(6f);
+
+            var tones = AddOverride<ShadowsMidtonesHighlights>(profile);
+            tones.shadows.Override(new Vector4(0.95f, 0.98f, 1.06f, 0f));
+            tones.highlights.Override(new Vector4(1.04f, 1f, 0.95f, 0f));
+
+            var bloom = AddOverride<Bloom>(profile);
+            bloom.intensity.Override(0.7f);
+            bloom.threshold.Override(1f);
+            bloom.scatter.Override(0.65f);
+
+            var vignette = AddOverride<Vignette>(profile);
+            vignette.intensity.Override(0.22f);
+            vignette.smoothness.Override(0.5f);
+
+            var grain = AddOverride<FilmGrain>(profile);
+            grain.type.Override(FilmGrainLookup.Thin1);
+            grain.intensity.Override(0.2f);
+
+            AssetDatabase.SaveAssets();
+
+            var volume = new GameObject("Post Processing").AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.sharedProfile = profile;
+        }
+
+        /// <summary>Компонент профиля нужно сохранить внутри ассета профиля, иначе он пропадёт после перезапуска.</summary>
+        private static T AddOverride<T>(VolumeProfile profile) where T : VolumeComponent
+        {
+            var component = profile.Add<T>(true);
+            component.name = typeof(T).Name;
+            component.hideFlags = HideFlags.HideInInspector | HideFlags.HideInHierarchy;
+            AssetDatabase.AddObjectToAsset(component, profile);
+            return component;
+        }
+
+        /// <summary>
+        /// Добавляет эффект к рендереру так же, как это делает инспектор: сам эффект — вложенный ассет,
+        /// а в рендерере — ссылка на него и его локальный идентификатор.
+        /// </summary>
+        private static void AddRendererFeature<T>(UniversalRendererData renderer, string name) where T : ScriptableRendererFeature
+        {
+            var feature = ScriptableObject.CreateInstance<T>();
+            feature.name = name;
+            AssetDatabase.AddObjectToAsset(feature, renderer);
+            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long localId);
+
+            var serialized = new SerializedObject(renderer);
+            var features = serialized.FindProperty("m_RendererFeatures");
+            var map = serialized.FindProperty("m_RendererFeatureMap");
+            features.arraySize++;
+            features.GetArrayElementAtIndex(features.arraySize - 1).objectReferenceValue = feature;
+            map.arraySize++;
+            map.GetArrayElementAtIndex(map.arraySize - 1).longValue = localId;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(renderer);
+        }
+    }
+}

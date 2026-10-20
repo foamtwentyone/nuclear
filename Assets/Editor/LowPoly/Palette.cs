@@ -28,7 +28,7 @@ namespace Nuclear.EditorTools.LowPoly
     }
 
     /// <summary>
-    /// Палитра low-poly стиля: блёклые, выгоревшие под пеплом цвета. Сохраняется маленькой текстурой
+    /// Палитра low-poly стиля: выгоревшие под пеплом, но тёплые цвета (ржавчина, сухая трава, старое дерево). Сохраняется маленькой текстурой
     /// с точечной фильтрацией; модели ссылаются на клетки через UV.
     /// </summary>
     public static class Palette
@@ -39,19 +39,19 @@ namespace Nuclear.EditorTools.LowPoly
         private static readonly Color[] Colors =
         {
             // Земля и пепел
-            Hex(0x57544f), Hex(0x6b6863), Hex(0x7e7a73), Hex(0x5e554b), Hex(0x6b6447), Hex(0x2b2724), Hex(0x423b35),
+            Hex(0x5a5550), Hex(0x6f6a62), Hex(0x857e72), Hex(0x66574a), Hex(0x7a7048), Hex(0x2b2724), Hex(0x463d35),
             // Дорога и бетон
-            Hex(0x3a3a3b), Hex(0x2a2a2b), Hex(0x9c8f5a), Hex(0x8a8781), Hex(0x6a6762), Hex(0x5a554a),
+            Hex(0x3d3c3c), Hex(0x2c2b2b), Hex(0xb09a55), Hex(0x8f8a82), Hex(0x6d6862), Hex(0x5e574b),
             // Металл
-            Hex(0x7a7d7f), Hex(0x45484b), Hex(0x7a4a2c), Hex(0x4f3020), Hex(0xa3a6a6),
+            Hex(0x7a7d7f), Hex(0x45484b), Hex(0x8a4f2a), Hex(0x5a3320), Hex(0xa3a6a6),
             // Дерево и кирпич
-            Hex(0x6b5038), Hex(0x4a3828), Hex(0x8f7656), Hex(0x3d342c), Hex(0x2a241f), Hex(0x7a4636),
+            Hex(0x7a5a3c), Hex(0x523d2a), Hex(0x9c8160), Hex(0x433830), Hex(0x2d2620), Hex(0x84492f),
             // Машины
-            Hex(0x7d3b32), Hex(0x3e5466), Hex(0x4f5e45), Hex(0x9b8f74), Hex(0x2c3438), Hex(0x1c1c1d),
+            Hex(0x8c3a2e), Hex(0x3f5a70), Hex(0x55663f), Hex(0xa8977a), Hex(0x2c3438), Hex(0x1c1c1d),
             // Разметка и пометки
             Hex(0xc9a227), Hex(0x232220), Hex(0xa8352a), Hex(0xd9d6cf),
             // Выживший
-            Hex(0x55593f), Hex(0x3e412e), Hex(0x3f3f40), Hex(0x6f6550), Hex(0x262626), Hex(0x5f7a6e), Hex(0x2a2420),
+            Hex(0x5b6040), Hex(0x41452f), Hex(0x3f3f40), Hex(0x7a6c52), Hex(0x262626), Hex(0x5f7a6e), Hex(0x2a2420),
             // Предметы
             Hex(0x5b6340), Hex(0x434a2f), Hex(0xa88a46), Hex(0xa0603a), Hex(0x55575a), Hex(0x2d3238), Hex(0xc8bfa4), Hex(0x9a4a35),
             // Слепыш

@@ -60,6 +60,7 @@ namespace Nuclear.EditorTools
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = FogColor;
             cameraObject.AddComponent<AudioListener>();
+            ConfigureCameraForPipeline(camera);
 
             AddAsh(root.transform);
 
