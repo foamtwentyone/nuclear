@@ -263,7 +263,8 @@ namespace Nuclear.Player
             if (voice != null && voice.Current != Loudness.Quiet)
             {
                 bool shout = voice.Current == Loudness.Shout;
-                var center = new Vector2(bar.xMax - 14f * s, baseY - 64f * s);
+                // В левом столбце над фильтром и дозой: справа от полосы на узких экранах начинается инвентарь.
+                var center = new Vector2(x + 22f * s, baseY - (doseAlpha > 0.01f ? 160f : 112f) * s);
                 HudDraw.Badge(center, 18f, HudIcon.Microphone, shout ? Alarm : Amber, shout ? 160 + HudSketch.Boil : 160);
                 HudDraw.Text(new Rect(center.x + 26f * s, center.y - 17f * s, 80f * s, 34f * s), shout ? "20 м!" : "8 м", 24f, shout ? Alarm : Amber);
             }
@@ -325,7 +326,8 @@ namespace Nuclear.Player
                 HudSketch.Fill(circle, HudDraw.WithAlpha(HudDraw.Paper, selected ? 1f : 0.72f));
                 HudSketch.Stroke(circle, (selected ? 4.5f : 3f) * s, HudDraw.WithAlpha(HudDraw.Ink, selected ? 1f : 0.8f), true, 210 + i * 13);
 
-                HudDraw.Text(new Rect(center.x - r - 6f * s, center.y - r - 12f * s, 30f * s, 30f * s), (i + 1).ToString(),
+                // Цифра снаружи кружка, по диагонали сверху слева — не лежит на обводке.
+                HudDraw.Text(new Rect(center.x - r - 22f * s, center.y - r - 22f * s, 30f * s, 30f * s), (i + 1).ToString(),
                     selected ? 24f : 20f, HudDraw.WithAlpha(HudDraw.Cream, selected ? 1f : 0.75f), TextAnchor.MiddleCenter);
 
                 if (!slot.Filled)
@@ -346,13 +348,13 @@ namespace Nuclear.Player
             var selectedSlot = gear[gear.Selected];
             if (nameAlpha <= 0.01f || !selectedSlot.Filled)
                 return;
-            float top = centerY - radius * 1.18f * s - 6f * s;
-            HudDraw.Text(new Rect(0f, top - 78f * s, Screen.width, 38f * s), GearPickup.NameOf(selectedSlot.Kind), 30f,
+            float top = centerY - radius * 1.18f * s - 30f * s;
+            HudDraw.Text(new Rect(0f, top - 82f * s, Screen.width, 38f * s), GearPickup.NameOf(selectedSlot.Kind), 30f,
                 HudDraw.WithAlpha(HudDraw.Cream, nameAlpha), TextAnchor.MiddleCenter);
             string use = gear.UseHint();
             var dim = HudDraw.WithAlpha(HudDraw.Dim, nameAlpha);
             string drop = selectedSlot.Kind == GearKind.Can ? "бросить" : "выбросить";
-            var hintCenter = new Vector2(Screen.width / 2f, top - 28f * s);
+            var hintCenter = new Vector2(Screen.width / 2f, top - 30f * s);
             if (use != null)
                 HudDraw.KeyHints(hintCenter, 20f, dim, ("ПКМ", use), ("Q", drop));
             else
