@@ -103,6 +103,23 @@ namespace Nuclear.EditorTools
         }
 
         /// <summary>
+        /// Мультяшный шейдер (Assets/Shaders/Toon.shader) — только под URP. Если его нет или он не
+        /// скомпилировался, поверхности остаются на URP Lit, чтобы не было розовых материалов.
+        /// </summary>
+        private static Shader SurfaceShader(bool emissive)
+        {
+            if (!UsingUrp || emissive)
+                return LitShader;
+            var toon = Shader.Find("Nuclear/Toon");
+            if (toon == null || ShaderUtil.ShaderHasError(toon))
+            {
+                Debug.LogWarning("Шейдер Nuclear/Toon недоступен — поверхности будут на URP Lit.");
+                return LitShader;
+            }
+            return toon;
+        }
+
+        /// <summary>
         /// Текстуры и материалы поверхностей: карта нормалей одна на тип поверхности,
         /// цветная текстура и материал — на каждый цвет палитры.
         /// </summary>
@@ -174,14 +191,15 @@ namespace Nuclear.EditorTools
         {
             string path = $"{MaterialFolder}/{name}.mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            var shader = SurfaceShader(emission.HasValue);
             if (material == null)
             {
-                material = new Material(LitShader);
+                material = new Material(shader);
                 AssetDatabase.CreateAsset(material, path);
             }
-            else if (material.shader != LitShader)
+            else if (material.shader != shader)
             {
-                material.shader = LitShader;
+                material.shader = shader;
             }
 
             material.color = color;

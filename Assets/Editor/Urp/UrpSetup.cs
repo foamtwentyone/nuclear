@@ -61,10 +61,12 @@ namespace Nuclear.EditorTools.Urp
         /// Отключает Depth Priming. С ним (а SSAO его включает в режиме Auto) URP рисует непрозрачное
         /// только там, где глубина совпала с предварительным проходом. Оболочки контуров в этот проход
         /// не попадают и целиком отсекаются — обводки пропадают.
+        /// Режим — обычный Forward: под него написан цикл дополнительных источников в шейдере Nuclear/Toon.
         /// </summary>
         private static void PrepareRenderer(UniversalRendererData renderer)
         {
             renderer.depthPrimingMode = DepthPrimingMode.Disabled;
+            renderer.renderingMode = RenderingMode.Forward;
             EditorUtility.SetDirty(renderer);
             AssetDatabase.SaveAssets();
         }

@@ -62,13 +62,13 @@ namespace Nuclear.Enemies
         private AudioSource voice;
         private AudioSource breathing;
         private float nextClickTime;
-        private Renderer head;
-        private MaterialPropertyBlock headBlock;
+        private Renderer bodyRenderer;
+        private MaterialPropertyBlock tintBlock;
 
         private Vector3 HearingPoint => transform.position + Vector3.up * 1.2f;
 
         /// <summary>Откуда кусает: морда спереди длинного тела, а не его центр.</summary>
-        private Vector3 MouthPoint => transform.position + transform.forward * 1.3f;
+        private Vector3 MouthPoint => transform.position + transform.forward * 1.6f;
 
         private void Awake()
         {
@@ -77,16 +77,17 @@ namespace Nuclear.Enemies
             breathing.clip = ProceduralAudio.BlindPurr;
             breathing.loop = true;
 
-            var headTransform = transform.Find("Head");
-            if (headTransform != null)
-                head = headTransform.GetComponent<Renderer>();
-            headBlock = new MaterialPropertyBlock();
+            // Оттенок состояния — на всей туше (голова у неё не отдельная).
+            var bodyTransform = transform.Find("Body");
+            if (bodyTransform != null)
+                bodyRenderer = bodyTransform.GetComponent<Renderer>();
+            tintBlock = new MaterialPropertyBlock();
         }
 
         public override void OnNetworkSpawn()
         {
             CurrentState.OnValueChanged += OnStateChanged;
-            UpdateHeadColor();
+            UpdateTint();
             // Разная фаза дыхания, чтобы несколько Слепышей не дышали хором.
             breathing.time = Random.Range(0f, breathing.clip.length);
             breathing.Play();
@@ -286,7 +287,7 @@ namespace Nuclear.Enemies
 
         private void OnStateChanged(State previous, State current)
         {
-            UpdateHeadColor();
+            UpdateTint();
             if (current == State.Rush)
             {
                 voice.pitch = Random.Range(0.95f, 1.05f);
@@ -310,12 +311,12 @@ namespace Nuclear.Enemies
         }
 
         /// <summary>
-        /// Временная подсказка для тестов: оттенок головы показывает, что Слепыш делает.
+        /// Временная подсказка для тестов: оттенок туши показывает, что Слепыш делает.
         /// Цвет умножается на палитру модели, поэтому «бродит» — без оттенка.
         /// </summary>
-        private void UpdateHeadColor()
+        private void UpdateTint()
         {
-            if (head == null)
+            if (bodyRenderer == null)
                 return;
 
             Color color = CurrentState.Value switch
@@ -325,10 +326,10 @@ namespace Nuclear.Enemies
                 State.Listen => new Color(0.7f, 0.82f, 1f),
                 _ => Color.white,
             };
-            head.GetPropertyBlock(headBlock);
-            headBlock.SetColor(ColorId, color);
-            headBlock.SetColor(BaseColorId, color);
-            head.SetPropertyBlock(headBlock);
+            bodyRenderer.GetPropertyBlock(tintBlock);
+            tintBlock.SetColor(ColorId, color);
+            tintBlock.SetColor(BaseColorId, color);
+            bodyRenderer.SetPropertyBlock(tintBlock);
         }
     }
 }

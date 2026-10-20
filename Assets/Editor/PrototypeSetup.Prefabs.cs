@@ -268,14 +268,13 @@ namespace Nuclear.EditorTools
         {
             var root = new GameObject("BlindOne");
 
-            var body = root.AddComponent<Rigidbody>();
-            body.isKinematic = true;
+            root.AddComponent<Rigidbody>().isKinematic = true;
             // Длинное круглое тело: капсула вдоль Z.
             var capsule = root.AddComponent<CapsuleCollider>();
             capsule.direction = 2;
-            capsule.center = new Vector3(0f, 0.8f, 0.25f);
-            capsule.height = 3.1f;
-            capsule.radius = 0.66f;
+            capsule.center = new Vector3(0f, 0.85f, 0.1f);
+            capsule.height = 3.3f;
+            capsule.radius = 0.8f;
 
             root.AddComponent<NetworkObject>();
             var netTransform = root.AddComponent<NetworkTransform>();
@@ -285,26 +284,20 @@ namespace Nuclear.EditorTools
             netTransform.SyncScaleY = false;
             netTransform.SyncScaleZ = false;
 
-            // Части отдельно, чтобы BlindOneAnimator мог их двигать.
-            var random = new System.Random(13);
+            // Туша вылеплена целиком; нос — дочерний объект тела (сжимается вместе с ним), лапы — отдельно.
             var bodyKit = new MeshKit();
-            Models.BlindOneBody(bodyKit, random);
-            AddModel(root.transform, "Body", bodyKit, Vector3.zero, Quaternion.identity);
-
-            // Голова отдельным объектом ещё и потому, что её оттенок показывает состояние (см. BlindOne.UpdateHeadColor).
-            var headKit = new MeshKit();
-            Models.BlindOneHead(headKit, random);
-            var head = AddModel(root.transform, "Head", headKit, Models.BlindOneNeck, Quaternion.identity);
+            Models.BlindOneBody(bodyKit);
+            var body = AddModel(root.transform, "Body", bodyKit, Vector3.zero, Quaternion.identity);
 
             var noseKit = new MeshKit();
             Models.BlindOneNoseStar(noseKit);
-            AddModel(head.transform, "Nose", noseKit, Models.BlindOneNose, Quaternion.identity);
+            AddModel(body.transform, "Nose", noseKit, Models.BlindOneNose, Quaternion.identity);
 
             // Порядок лап: передняя левая, передняя правая, задняя левая, задняя правая.
             for (int i = 0; i < Models.BlindOneHips.Length; i++)
             {
                 var legKit = new MeshKit();
-                Models.BlindOneLeg(legKit, random);
+                Models.BlindOneLeg(legKit);
                 AddModel(root.transform, $"Leg {i}", legKit, Models.BlindOneHips[i], Quaternion.identity);
             }
 
