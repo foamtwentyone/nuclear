@@ -76,9 +76,26 @@ namespace Nuclear.EditorTools
 
         // ---------- Материалы ----------
 
-        private static bool UsingUrp => GraphicsSettings.defaultRenderPipeline != null;
+        /// <summary>Активен ли URP: смотрим и на уровень качества, и на общий конвейер.</summary>
+        private static bool UsingUrp
+        {
+            get
+            {
+                var pipeline = GraphicsSettings.currentRenderPipeline != null ? GraphicsSettings.currentRenderPipeline : GraphicsSettings.defaultRenderPipeline;
+                return pipeline != null && pipeline.GetType().Name.Contains("Universal");
+            }
+        }
 
-        private static Shader LitShader => Shader.Find(UsingUrp ? "Universal Render Pipeline/Lit" : "Standard");
+        private static Shader LitShader
+        {
+            get
+            {
+                var shader = Shader.Find(UsingUrp ? "Universal Render Pipeline/Lit" : "Standard");
+                if (shader == null)
+                    Debug.LogError("Не найден шейдер для текущего конвейера рендера — материалы будут розовыми.");
+                return shader;
+            }
+        }
 
         private static void CreateSharedMaterials()
         {
