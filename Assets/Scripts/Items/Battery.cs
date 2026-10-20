@@ -1,3 +1,4 @@
+using Nuclear.Audio;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -23,11 +24,13 @@ namespace Nuclear.Items
 
         private static readonly int ColorId = Shader.PropertyToID("_Color");
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
         private PhysicsItem item;
         private Renderer indicator;
         private ParticleSystem sparks;
         private MaterialPropertyBlock indicatorBlock;
+        private AudioSource sparkSource;
 
         private void Awake()
         {
@@ -37,6 +40,12 @@ namespace Nuclear.Items
             if (indicatorTransform != null)
                 indicator = indicatorTransform.GetComponent<Renderer>();
             indicatorBlock = new MaterialPropertyBlock();
+
+            sparkSource = gameObject.AddComponent<AudioSource>();
+            sparkSource.spatialBlend = 1f;
+            sparkSource.rolloffMode = AudioRolloffMode.Linear;
+            sparkSource.maxDistance = 20f;
+            sparkSource.playOnAwake = false;
         }
 
         public override void OnNetworkSpawn()
@@ -69,6 +78,7 @@ namespace Nuclear.Items
         {
             if (sparks != null)
                 sparks.Play();
+            sparkSource.PlayOneShot(ProceduralAudio.Sparks, 0.8f);
         }
 
         private void OnChargeChanged(float previous, float current) => UpdateIndicator();
@@ -82,6 +92,7 @@ namespace Nuclear.Items
             indicator.GetPropertyBlock(indicatorBlock);
             indicatorBlock.SetColor(ColorId, color);
             indicatorBlock.SetColor(BaseColorId, color);
+            indicatorBlock.SetColor(EmissionId, color * 1.5f);
             indicator.SetPropertyBlock(indicatorBlock);
         }
     }

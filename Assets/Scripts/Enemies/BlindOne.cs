@@ -61,6 +61,8 @@ namespace Nuclear.Enemies
         private float nextSwipeTime;
         private AudioSource voice;
         private AudioSource breathing;
+        private float nextClickTime;
+        private int clicksLeft;
         private Renderer head;
         private MaterialPropertyBlock headBlock;
 
@@ -70,7 +72,7 @@ namespace Nuclear.Enemies
         {
             voice = CreateAudioSource(30f);
             breathing = CreateAudioSource(12f);
-            breathing.clip = ProceduralAudio.Breath;
+            breathing.clip = ProceduralAudio.BlindBreath;
             breathing.loop = true;
 
             var headTransform = transform.Find("Head");
@@ -83,6 +85,8 @@ namespace Nuclear.Enemies
         {
             CurrentState.OnValueChanged += OnStateChanged;
             UpdateHeadColor();
+            // Разная фаза дыхания, чтобы несколько Слепышей не дышали хором.
+            breathing.time = Random.Range(0f, breathing.clip.length);
             breathing.Play();
 
             if (!IsServer)
@@ -109,7 +113,12 @@ namespace Nuclear.Enemies
 
         private void Update()
         {
-            if (!IsSpawned || !IsServer || !agent.isOnNavMesh)
+            if (!IsSpawned)
+                return;
+
+            UpdateEchoClicks();
+
+            if (!IsServer || !agent.isOnNavMesh)
                 return;
 
             switch (CurrentState.Value)
@@ -225,13 +234,42 @@ namespace Nuclear.Enemies
                 return;
 
             nextSwipeTime = Time.time + swipeCooldown;
-            SwipeSoundRpc();
 
+            bool hit = false;
             foreach (var survival in AlivePlayers())
             {
                 if (Vector3.Distance(survival.transform.position, transform.position) <= swipeRange)
+                {
                     survival.TakeDamage(swipeDamage);
+                    hit = true;
+                }
             }
+            SwipeSoundRpc(hit);
+        }
+
+        /// <summary>
+        /// Пока слушает или проверяет шум, Слепыш щёлкает языком сериями по 2–3.
+        /// Играется у всех локально: по щелчкам его можно засечь в тумане.
+        /// </summary>
+        private void UpdateEchoClicks()
+        {
+            var state = CurrentState.Value;
+            if (state != State.Listen && state != State.Investigate)
+            {
+                clicksLeft = 0;
+                return;
+            }
+
+            if (Time.time < nextClickTime)
+                return;
+
+            if (clicksLeft <= 0)
+                clicksLeft = Random.Range(2, 4);
+
+            voice.pitch = Random.Range(0.92f, 1.08f);
+            voice.PlayOneShot(ProceduralAudio.EchoClick, 0.9f);
+            clicksLeft--;
+            nextClickTime = Time.time + (clicksLeft > 0 ? 0.13f : Random.Range(1.2f, 2.2f));
         }
 
         private IEnumerable<PlayerSurvival> AlivePlayers()
@@ -255,16 +293,25 @@ namespace Nuclear.Enemies
         {
             UpdateHeadColor();
             if (current == State.Rush)
-                voice.PlayOneShot(ProceduralAudio.Growl);
+            {
+                voice.pitch = Random.Range(0.95f, 1.05f);
+                voice.PlayOneShot(ProceduralAudio.Scream);
+            }
         }
 
         [Rpc(SendTo.ClientsAndHost)]
-        private void SwipeSoundRpc()
+        private void SwipeSoundRpc(bool hit)
         {
+            voice.pitch = 1f;
             voice.PlayOneShot(ProceduralAudio.Swipe);
+            if (hit)
+                voice.PlayOneShot(ProceduralAudio.HitFlesh);
         }
 
-        /// <summary>Временная подсказка для тестов: цвет головы показывает, что Слепыш делает.</summary>
+        /// <summary>
+        /// Временная подсказка для тестов: оттенок головы показывает, что Слепыш делает.
+        /// Цвет умножается на палитру модели, поэтому «бродит» — без оттенка.
+        /// </summary>
         private void UpdateHeadColor()
         {
             if (head == null)
@@ -272,10 +319,10 @@ namespace Nuclear.Enemies
 
             Color color = CurrentState.Value switch
             {
-                State.Investigate => new Color(0.9f, 0.75f, 0.2f),
-                State.Rush => new Color(0.9f, 0.15f, 0.1f),
-                State.Listen => new Color(0.4f, 0.6f, 0.9f),
-                _ => new Color(0.75f, 0.7f, 0.65f),
+                State.Investigate => new Color(1f, 0.9f, 0.55f),
+                State.Rush => new Color(1f, 0.5f, 0.45f),
+                State.Listen => new Color(0.7f, 0.82f, 1f),
+                _ => Color.white,
             };
             head.GetPropertyBlock(headBlock);
             headBlock.SetColor(ColorId, color);

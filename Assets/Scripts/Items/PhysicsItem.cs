@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Nuclear.Audio;
 using Nuclear.Noise;
 using Nuclear.Player;
 using Unity.Netcode;
@@ -15,6 +16,13 @@ namespace Nuclear.Items
     [RequireComponent(typeof(Rigidbody))]
     public class PhysicsItem : NetworkBehaviour
     {
+        public enum ImpactSound : byte
+        {
+            Wood,
+            Metal,
+            Tin,
+        }
+
         [Header("Переноска")]
         [SerializeField] private string displayName = "Предмет";
         [SerializeField, Range(1, 2)] private int maxCarriers = 1;
@@ -37,6 +45,10 @@ namespace Nuclear.Items
         [SerializeField] private float throwImpulse = 3f;
 
         [Header("Удары")]
+        [SerializeField] private ImpactSound impactSound = ImpactSound.Wood;
+        [Tooltip("Медленнее этого (м/с) удар не слышно вовсе.")]
+        [SerializeField] private float impactSoundMinSpeed = 0.7f;
+        [Tooltip("С этой скорости (м/с) удар слышит Слепыш.")]
         [SerializeField] private float impactNoiseMinSpeed = 1.5f;
         [SerializeField] private float impactNoiseRadius = 12f;
 
@@ -55,11 +67,25 @@ namespace Nuclear.Items
         private Rigidbody body;
         private Collider[] colliders;
         private float nextImpactTime;
+        private AudioSource impactSource;
 
         private void Awake()
         {
             body = GetComponent<Rigidbody>();
             colliders = GetComponentsInChildren<Collider>();
+
+            impactSource = gameObject.AddComponent<AudioSource>();
+            impactSource.spatialBlend = 1f;
+            impactSource.rolloffMode = AudioRolloffMode.Linear;
+            impactSource.minDistance = 1f;
+            impactSource.maxDistance = 25f;
+            impactSource.playOnAwake = false;
+        }
+
+        public override void OnNetworkSpawn()
+        {
+            // Первую секунду предмет оседает на землю: эти удары не звучат и не шумят.
+            nextImpactTime = Time.time + 1f;
         }
 
         public override void OnNetworkDespawn()
@@ -149,13 +175,31 @@ namespace Nuclear.Items
                 return;
 
             float speed = collision.relativeVelocity.magnitude;
-            if (speed < impactNoiseMinSpeed)
+            if (speed < impactSoundMinSpeed)
                 return;
 
             // Подпрыгивания после удара не считаем отдельными ударами.
             nextImpactTime = Time.time + 0.25f;
+            ImpactSoundRpc(Mathf.Clamp01(speed / 8f));
+
+            if (speed < impactNoiseMinSpeed)
+                return;
+
             NoiseEvents.Emit(collision.GetContact(0).point, impactNoiseRadius);
             Impacted?.Invoke(speed);
+        }
+
+        [Rpc(SendTo.ClientsAndHost)]
+        private void ImpactSoundRpc(float strength)
+        {
+            var clip = impactSound switch
+            {
+                ImpactSound.Metal => ProceduralAudio.ImpactMetal,
+                ImpactSound.Tin => ProceduralAudio.ImpactTin,
+                _ => ProceduralAudio.ImpactWood,
+            };
+            impactSource.pitch = UnityEngine.Random.Range(0.9f, 1.1f);
+            impactSource.PlayOneShot(clip, Mathf.Lerp(0.15f, 1f, strength));
         }
     }
 }

@@ -1,0 +1,105 @@
+using UnityEditor;
+using UnityEngine;
+
+namespace Nuclear.EditorTools.LowPoly
+{
+    /// <summary>Цвета палитры. Все low-poly модели красятся одной текстурой, где каждый цвет — клетка.</summary>
+    public enum Swatch
+    {
+        // Земля и пепел
+        AshDark, Ash, AshLight, Dirt, DeadGrass, Scorched, ScorchedLight,
+        // Дорога и бетон
+        Asphalt, AsphaltDark, RoadLine, Concrete, ConcreteDark, ConcreteStain,
+        // Металл
+        Metal, MetalDark, Rust, RustDark, Tin,
+        // Дерево и кирпич
+        Wood, WoodDark, WoodPale, Bark, BarkDark, Brick,
+        // Машины
+        PaintRed, PaintBlue, PaintGreen, PaintBeige, Glass, Tire,
+        // Разметка и пометки
+        HazardYellow, HazardBlack, SignalRed, White,
+        // Выживший
+        Jacket, JacketDark, Trousers, Canvas, Rubber, Lens, Boots,
+        // Предметы
+        FilterOlive, FilterOliveDark, Brass, Copper, Lead, BatteryCase, LabelPaper, CanLabel,
+        // Слепыш
+        Skin, SkinDark, SkinPale, Mouth, Claw,
+    }
+
+    /// <summary>
+    /// Палитра low-poly стиля: блёклые, выгоревшие под пеплом цвета. Сохраняется маленькой текстурой
+    /// с точечной фильтрацией; модели ссылаются на клетки через UV.
+    /// </summary>
+    public static class Palette
+    {
+        private const int Columns = 8;
+        private const int CellPixels = 4;
+
+        private static readonly Color[] Colors =
+        {
+            // Земля и пепел
+            Hex(0x57544f), Hex(0x6b6863), Hex(0x7e7a73), Hex(0x5e554b), Hex(0x6b6447), Hex(0x2b2724), Hex(0x423b35),
+            // Дорога и бетон
+            Hex(0x3a3a3b), Hex(0x2a2a2b), Hex(0x9c8f5a), Hex(0x8a8781), Hex(0x6a6762), Hex(0x5a554a),
+            // Металл
+            Hex(0x7a7d7f), Hex(0x45484b), Hex(0x7a4a2c), Hex(0x4f3020), Hex(0xa3a6a6),
+            // Дерево и кирпич
+            Hex(0x6b5038), Hex(0x4a3828), Hex(0x8f7656), Hex(0x3d342c), Hex(0x2a241f), Hex(0x7a4636),
+            // Машины
+            Hex(0x7d3b32), Hex(0x3e5466), Hex(0x4f5e45), Hex(0x9b8f74), Hex(0x2c3438), Hex(0x1c1c1d),
+            // Разметка и пометки
+            Hex(0xc9a227), Hex(0x232220), Hex(0xa8352a), Hex(0xd9d6cf),
+            // Выживший
+            Hex(0x55593f), Hex(0x3e412e), Hex(0x3f3f40), Hex(0x6f6550), Hex(0x262626), Hex(0x5f7a6e), Hex(0x2a2420),
+            // Предметы
+            Hex(0x5b6340), Hex(0x434a2f), Hex(0xa88a46), Hex(0xa0603a), Hex(0x55575a), Hex(0x2d3238), Hex(0xc8bfa4), Hex(0x9a4a35),
+            // Слепыш
+            Hex(0xb8a89c), Hex(0x8c7a70), Hex(0xd6c9bd), Hex(0x3a1f1e), Hex(0x2e2a26),
+        };
+
+        public static int Count => Colors.Length;
+
+        private static int Rows => (Colors.Length + Columns - 1) / Columns;
+
+        /// <summary>UV центра клетки цвета в палитре.</summary>
+        public static Vector2 UV(Swatch swatch)
+        {
+            int index = (int)swatch;
+            int column = index % Columns;
+            int row = index / Columns;
+            return new Vector2((column + 0.5f) / Columns, (row + 0.5f) / Rows);
+        }
+
+        public static Color ColorOf(Swatch swatch) => Colors[(int)swatch];
+
+        /// <summary>Создаёт текстуру палитры и сохраняет её ассетом (без mip-уровней и сглаживания).</summary>
+        public static Texture2D SaveTexture(string path)
+        {
+            Debug.Assert(Colors.Length == System.Enum.GetValues(typeof(Swatch)).Length, "Палитра и Swatch разошлись");
+
+            var texture = new Texture2D(Columns * CellPixels, Rows * CellPixels, TextureFormat.RGBA32, false)
+            {
+                name = "Palette",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+            };
+
+            for (int y = 0; y < texture.height; y++)
+            {
+                for (int x = 0; x < texture.width; x++)
+                {
+                    int index = (y / CellPixels) * Columns + x / CellPixels;
+                    texture.SetPixel(x, y, index < Colors.Length ? Colors[index] : Color.magenta);
+                }
+            }
+            texture.Apply(false);
+
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(texture, path);
+            return texture;
+        }
+
+        private static Color Hex(int rgb) =>
+            new Color(((rgb >> 16) & 0xff) / 255f, ((rgb >> 8) & 0xff) / 255f, (rgb & 0xff) / 255f);
+    }
+}

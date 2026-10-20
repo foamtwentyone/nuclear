@@ -66,12 +66,21 @@ namespace Nuclear.Player
             if (listener != null)
                 listener.enabled = IsOwner;
 
+            // Пепел падает вокруг своего игрока; у чужих он не нужен.
+            var ash = transform.Find("Ash");
+            if (ash != null)
+                ash.gameObject.SetActive(IsOwner);
+
             if (!IsOwner)
                 return;
 
-            // Своё тело не рисуем, чтобы капсула не мешала обзору.
-            foreach (var bodyRenderer in GetComponentsInChildren<Renderer>())
-                bodyRenderer.enabled = false;
+            // Своё тело не рисуем, чтобы модель не мешала обзору.
+            var body = transform.Find("Body");
+            if (body != null)
+            {
+                foreach (var bodyRenderer in body.GetComponentsInChildren<Renderer>())
+                    bodyRenderer.enabled = false;
+            }
 
             // Разводим игроков по кругу, чтобы они не появлялись друг в друге.
             float angle = OwnerClientId * 90f * Mathf.Deg2Rad;

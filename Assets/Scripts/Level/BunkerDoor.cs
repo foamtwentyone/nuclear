@@ -45,14 +45,18 @@ namespace Nuclear.Level
 
         private static readonly int ColorId = Shader.PropertyToID("_Color");
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
         private Transform panel;
         private NavMeshObstacle panelObstacle;
         private Transform socket;
         private GameObject insertedBattery;
         private Renderer lamp;
+        private Light lampLight;
         private MaterialPropertyBlock lampBlock;
         private AudioSource rumble;
+        private AudioSource sfx;
+        private float nextAlarmTime;
         private Vector3 panelClosedPosition;
         private float openDuration;
         private float nextNoiseTime;
@@ -64,6 +68,7 @@ namespace Nuclear.Level
             socket = transform.Find("Socket");
             insertedBattery = transform.Find("Inserted Battery")?.gameObject;
             lamp = transform.Find("Lamp")?.GetComponent<Renderer>();
+            lampLight = lamp != null ? lamp.GetComponentInChildren<Light>() : null;
             lampBlock = new MaterialPropertyBlock();
             if (panel != null)
             {
@@ -79,6 +84,13 @@ namespace Nuclear.Level
             rumble.minDistance = 2f;
             rumble.maxDistance = 40f;
             rumble.playOnAwake = false;
+
+            sfx = gameObject.AddComponent<AudioSource>();
+            sfx.spatialBlend = 1f;
+            sfx.rolloffMode = AudioRolloffMode.Linear;
+            sfx.minDistance = 2f;
+            sfx.maxDistance = 50f;
+            sfx.playOnAwake = false;
         }
 
         public override void OnNetworkSpawn()
@@ -105,6 +117,13 @@ namespace Nuclear.Level
 
             if (panel != null)
                 panel.localPosition = panelClosedPosition + Vector3.up * (Progress.Value * panelTravel);
+
+            // Сирена звучит в такт шуму для Слепыша: игроки слышат то же, что и он.
+            if (State.Value == DoorState.Opening && Time.time >= nextAlarmTime)
+            {
+                nextAlarmTime = Time.time + noiseInterval;
+                sfx.PlayOneShot(ProceduralAudio.DoorAlarm, 0.7f);
+            }
         }
 
         private void ServerTick()
@@ -159,9 +178,17 @@ namespace Nuclear.Level
         private void RejectRpc()
         {
             LastRejectTime = Time.time;
+            sfx.PlayOneShot(ProceduralAudio.Sparks, 0.6f);
         }
 
-        private void OnStateChanged(DoorState previous, DoorState current) => ApplyVisuals();
+        private void OnStateChanged(DoorState previous, DoorState current)
+        {
+            ApplyVisuals();
+            if (current == DoorState.Opening)
+                nextAlarmTime = Time.time + 0.8f;
+            if (current != DoorState.Locked)
+                sfx.PlayOneShot(ProceduralAudio.DoorClunk, 1f);
+        }
 
         private void ApplyVisuals()
         {
@@ -188,7 +215,10 @@ namespace Nuclear.Level
             lamp.GetPropertyBlock(lampBlock);
             lampBlock.SetColor(ColorId, color);
             lampBlock.SetColor(BaseColorId, color);
+            lampBlock.SetColor(EmissionId, color * 2f);
             lamp.SetPropertyBlock(lampBlock);
+            if (lampLight != null)
+                lampLight.color = color;
         }
     }
 }
