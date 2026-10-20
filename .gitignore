@@ -19,3 +19,17 @@
 .vscode/
 .idea/
 *.DS_Store
+
+# Создаётся меню «Nuclear → Собрать сцену прототипа» и «Включить URP» — в репозиторий не кладём.
+/[Aa]ssets/Generated/
+/[Aa]ssets/Generated.meta
+/[Aa]ssets/Materials/
+/[Aa]ssets/Materials.meta
+/[Aa]ssets/Prefabs/
+/[Aa]ssets/Prefabs.meta
+/[Aa]ssets/Scenes/
+/[Aa]ssets/Scenes.meta
+/[Aa]ssets/Settings/
+/[Aa]ssets/Settings.meta
+# Настройки IDE.
+.vsconfig
