@@ -29,7 +29,11 @@ namespace Nuclear.EditorTools
         /// <summary>Цвет пепельной дымки: им же заливается фон камер, чтобы горизонт растворялся в тумане.</summary>
         private static readonly Color FogColor = new(0.58f, 0.55f, 0.5f);
 
-        private static Material lowPolyMaterial;
+        private const string SurfaceMaterialFolder = MaterialFolder + "/Surfaces";
+        private const string TextureFolder = GeneratedFolder + "/Textures";
+
+        /// <summary>Материал с процедурной текстурой для каждого цвета палитры.</summary>
+        private static readonly Dictionary<Swatch, Material> surfaceMaterials = new();
         private static Material glowMaterial;
 
         [MenuItem("Nuclear/Собрать сцену прототипа")]
@@ -97,18 +101,50 @@ namespace Nuclear.EditorTools
             }
         }
 
+        /// <summary>
+        /// Текстуры и материалы поверхностей: карта нормалей одна на тип поверхности,
+        /// цветная текстура и материал — на каждый цвет палитры.
+        /// </summary>
         private static void CreateSharedMaterials()
         {
-            var palette = Palette.SaveTexture($"{GeneratedFolder}/Palette.asset");
-            lowPolyMaterial = SaveMaterial("LowPoly", Color.white, texture: palette, smoothness: 0.05f);
+            EnsureFolder(SurfaceMaterialFolder);
+            EnsureFolder(TextureFolder);
+
+            var normals = new Dictionary<Surface, Texture2D>();
+            foreach (Surface surface in Enum.GetValues(typeof(Surface)))
+                normals[surface] = SaveTexture($"{TextureFolder}/{surface} Normal.asset", Surfaces.NormalPixels(surface), Surfaces.Resolution(surface), linear: true);
+
+            surfaceMaterials.Clear();
+            foreach (Swatch swatch in Enum.GetValues(typeof(Swatch)))
+            {
+                var surface = Surfaces.Of(swatch);
+                var albedo = SaveTexture($"{TextureFolder}/{swatch}.asset", Surfaces.AlbedoPixels(swatch), Surfaces.Resolution(surface), linear: false);
+                surfaceMaterials[swatch] = SaveMaterial($"Surfaces/{swatch}", Color.white, texture: albedo, smoothness: Surfaces.Smoothness(swatch), normalMap: normals[surface]);
+            }
+
             glowMaterial = SaveMaterial("Toxic Glow", new Color(0.55f, 1f, 0.35f), emission: new Color(0.6f, 1.6f, 0.3f));
+        }
+
+        private static Texture2D SaveTexture(string path, Color[] pixels, int size, bool linear)
+        {
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, true, linear)
+            {
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Trilinear,
+                anisoLevel = 4,
+            };
+            texture.SetPixels(pixels);
+            texture.Apply(true);
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(texture, path);
+            return texture;
         }
 
         /// <summary>
         /// Материал под текущий конвейер рендера (встроенный или URP). Если ассет уже есть,
         /// он обновляется — так материалы переключаются на URP после его включения.
         /// </summary>
-        private static Material SaveMaterial(string name, Color color, Color? emission = null, Texture texture = null, float smoothness = 0.1f)
+        private static Material SaveMaterial(string name, Color color, Color? emission = null, Texture texture = null, float smoothness = 0.1f, Texture normalMap = null)
         {
             string path = $"{MaterialFolder}/{name}.mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -130,14 +166,26 @@ namespace Nuclear.EditorTools
                     material.SetFloat(property, smoothness);
             }
 
-            // Матовый вид без «пластиковых» бликов и отражений неба: свойства и ключевые слова
-            // называются одинаково во встроенном Standard и в URP Lit, кроме отражений.
-            material.SetFloat("_SpecularHighlights", 0f);
-            material.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
-            material.SetFloat("_GlossyReflections", 0f);
-            material.EnableKeyword("_GLOSSYREFLECTIONS_OFF");
-            material.SetFloat("_EnvironmentReflections", 0f);
-            material.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+            // Рельеф: карта нормалей. Свойство и ключевое слово одинаковые в Standard и URP Lit.
+            material.SetTexture("_BumpMap", normalMap);
+            if (normalMap != null)
+                material.EnableKeyword("_NORMALMAP");
+            else
+                material.DisableKeyword("_NORMALMAP");
+
+            // Матовые поверхности — без «пластиковых» бликов и отражений неба; металл, стекло и краска блестят.
+            // Свойства и ключевые слова одинаковые в Standard и URP Lit, кроме отражений.
+            bool matte = smoothness < 0.2f;
+            material.SetFloat("_SpecularHighlights", matte ? 0f : 1f);
+            material.SetFloat("_GlossyReflections", matte ? 0f : 1f);
+            material.SetFloat("_EnvironmentReflections", matte ? 0f : 1f);
+            foreach (string keyword in new[] { "_SPECULARHIGHLIGHTS_OFF", "_GLOSSYREFLECTIONS_OFF", "_ENVIRONMENTREFLECTIONS_OFF" })
+            {
+                if (matte)
+                    material.EnableKeyword(keyword);
+                else
+                    material.DisableKeyword(keyword);
+            }
 
             if (emission.HasValue)
             {
@@ -170,9 +218,9 @@ namespace Nuclear.EditorTools
         // ---------- Меши и объекты ----------
 
         /// <summary>Сохраняет собранный меш ассетом: префабы и сцена ссылаются на него, а не хранят копию.</summary>
-        private static Mesh SaveMesh(MeshKit kit, string name)
+        private static Mesh SaveMesh(MeshKit kit, string name, out Swatch[] swatches)
         {
-            var mesh = kit.ToMesh(name);
+            var mesh = kit.ToMesh(name, out swatches);
             string path = AssetDatabase.GenerateUniqueAssetPath($"{MeshFolder}/{name}.asset");
             AssetDatabase.CreateAsset(mesh, path);
             return mesh;
@@ -186,8 +234,12 @@ namespace Nuclear.EditorTools
             model.transform.localPosition = position;
             model.transform.localRotation = rotation;
             model.transform.localScale = Vector3.one * scale;
-            model.AddComponent<MeshFilter>().sharedMesh = SaveMesh(kit, name);
-            model.AddComponent<MeshRenderer>().sharedMaterial = material != null ? material : lowPolyMaterial;
+            model.AddComponent<MeshFilter>().sharedMesh = SaveMesh(kit, name, out var swatches);
+            // По материалу на подсетку; переданный материал (свечение) заменяет все.
+            var materials = new Material[swatches.Length];
+            for (int i = 0; i < swatches.Length; i++)
+                materials[i] = material != null ? material : surfaceMaterials[swatches[i]];
+            model.AddComponent<MeshRenderer>().sharedMaterials = materials;
             AddBoxColliders(model, kit.Colliders);
             return model;
         }

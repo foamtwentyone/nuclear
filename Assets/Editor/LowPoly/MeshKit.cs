@@ -20,8 +20,8 @@ namespace Nuclear.EditorTools.LowPoly
     }
 
     /// <summary>
-    /// Сборщик low-poly мешей. У каждого треугольника свои вершины, поэтому затенение плоское,
-    /// а цвет задаётся UV-клеткой палитры. Поддерживает стек преобразований, как в старом OpenGL:
+    /// Сборщик low-poly мешей. У каждого треугольника свои вершины, поэтому затенение плоское.
+    /// Цвет палитры задаёт материал (с процедурной текстурой поверхности), UV — проекция в метрах. Поддерживает стек преобразований, как в старом OpenGL:
     /// можно собрать деталь в локальных координатах и поставить её куда нужно.
     /// Порядок вершин — по часовой стрелке, если смотреть на лицевую сторону (так принято в Unity).
     /// </summary>
@@ -30,6 +30,7 @@ namespace Nuclear.EditorTools.LowPoly
         private readonly List<Vector3> vertices = new();
         private readonly List<Vector2> uvs = new();
         private readonly List<int> triangles = new();
+        private readonly List<Swatch> triangleSwatches = new();
         private readonly Stack<Matrix4x4> stack = new();
         private Matrix4x4 matrix = Matrix4x4.identity;
 
@@ -50,17 +51,32 @@ namespace Nuclear.EditorTools.LowPoly
 
         public void Triangle(Vector3 a, Vector3 b, Vector3 c, Swatch swatch)
         {
-            Vector2 uv = Palette.UV(swatch);
+            Vector3 wa = matrix.MultiplyPoint3x4(a), wb = matrix.MultiplyPoint3x4(b), wc = matrix.MultiplyPoint3x4(c);
             int start = vertices.Count;
-            vertices.Add(matrix.MultiplyPoint3x4(a));
-            vertices.Add(matrix.MultiplyPoint3x4(b));
-            vertices.Add(matrix.MultiplyPoint3x4(c));
-            uvs.Add(uv);
-            uvs.Add(uv);
-            uvs.Add(uv);
+            vertices.Add(wa);
+            vertices.Add(wb);
+            vertices.Add(wc);
+
+            // UV — проекция на плоскость, к которой грань ближе всего, в метрах модели:
+            // текстура ложится в одном масштабе на любые детали и не растягивается.
+            Vector3 normal = Vector3.Cross(wb - wa, wc - wa);
+            float tile = Surfaces.MetersPerTile(Surfaces.Of(swatch));
+            uvs.Add(Project(wa, normal, tile));
+            uvs.Add(Project(wb, normal, tile));
+            uvs.Add(Project(wc, normal, tile));
+
             triangles.Add(start);
             triangles.Add(start + 1);
             triangles.Add(start + 2);
+            triangleSwatches.Add(swatch);
+        }
+
+        private static Vector2 Project(Vector3 point, Vector3 normal, float tile)
+        {
+            float ax = Mathf.Abs(normal.x), ay = Mathf.Abs(normal.y), az = Mathf.Abs(normal.z);
+            if (ay >= ax && ay >= az)
+                return new Vector2(point.x, point.z) / tile;
+            return ax >= az ? new Vector2(point.z, point.y) / tile : new Vector2(point.x, point.y) / tile;
         }
 
         /// <summary>Четырёхугольник a-b-c-d по часовой стрелке со стороны лицевой грани.</summary>
@@ -220,14 +236,37 @@ namespace Nuclear.EditorTools.LowPoly
             Colliders.Add(new BoxShape(world.MultiplyPoint3x4(Vector3.zero), Vector3.Scale(size, scale), world.rotation));
         }
 
-        public Mesh ToMesh(string name)
+        /// <summary>
+        /// Собирает меш. Треугольники одного цвета палитры идут одной подсеткой: у каждого цвета
+        /// свой материал с текстурой. swatches — цвета подсеток по порядку (для массива материалов).
+        /// </summary>
+        public Mesh ToMesh(string name, out Swatch[] swatches)
         {
+            var groups = new Dictionary<Swatch, List<int>>();
+            var order = new List<Swatch>();
+            for (int t = 0; t < triangleSwatches.Count; t++)
+            {
+                var swatch = triangleSwatches[t];
+                if (!groups.TryGetValue(swatch, out var indices))
+                {
+                    indices = new List<int>();
+                    groups.Add(swatch, indices);
+                    order.Add(swatch);
+                }
+                indices.Add(triangles[t * 3]);
+                indices.Add(triangles[t * 3 + 1]);
+                indices.Add(triangles[t * 3 + 2]);
+            }
+
             var mesh = new Mesh { name = name };
             if (vertices.Count > 65000)
                 mesh.indexFormat = IndexFormat.UInt32;
             mesh.SetVertices(vertices);
             mesh.SetUVs(0, uvs);
-            mesh.SetTriangles(triangles, 0);
+            mesh.subMeshCount = order.Count;
+            for (int i = 0; i < order.Count; i++)
+                mesh.SetTriangles(groups[order[i]], i);
+            swatches = order.ToArray();
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             mesh.RecalculateTangents();

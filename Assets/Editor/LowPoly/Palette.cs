@@ -1,9 +1,8 @@
-using UnityEditor;
 using UnityEngine;
 
 namespace Nuclear.EditorTools.LowPoly
 {
-    /// <summary>Цвета палитры. Все low-poly модели красятся одной текстурой, где каждый цвет — клетка.</summary>
+    /// <summary>Цвета палитры. У каждого — свой материал с процедурной текстурой поверхности.</summary>
     public enum Swatch
     {
         // Земля и пепел
@@ -28,14 +27,11 @@ namespace Nuclear.EditorTools.LowPoly
     }
 
     /// <summary>
-    /// Палитра low-poly стиля: выгоревшие под пеплом, но тёплые цвета (ржавчина, сухая трава, старое дерево). Сохраняется маленькой текстурой
-    /// с точечной фильтрацией; модели ссылаются на клетки через UV.
+    /// Палитра low-poly стиля: выгоревшие под пеплом, но тёплые цвета (ржавчина, сухая трава, старое дерево).
+    /// Каждый цвет — основа своей процедурной текстуры (см. Surfaces).
     /// </summary>
     public static class Palette
     {
-        private const int Columns = 8;
-        private const int CellPixels = 4;
-
         private static readonly Color[] Colors =
         {
             // Земля и пепел
@@ -59,47 +55,7 @@ namespace Nuclear.EditorTools.LowPoly
             Hex(0x7a6450), Hex(0x47382c), Hex(0xb3a185), Hex(0xc98a86), Hex(0x8c5556), Hex(0xd9c58f),
         };
 
-        public static int Count => Colors.Length;
-
-        private static int Rows => (Colors.Length + Columns - 1) / Columns;
-
-        /// <summary>UV центра клетки цвета в палитре.</summary>
-        public static Vector2 UV(Swatch swatch)
-        {
-            int index = (int)swatch;
-            int column = index % Columns;
-            int row = index / Columns;
-            return new Vector2((column + 0.5f) / Columns, (row + 0.5f) / Rows);
-        }
-
         public static Color ColorOf(Swatch swatch) => Colors[(int)swatch];
-
-        /// <summary>Создаёт текстуру палитры и сохраняет её ассетом (без mip-уровней и сглаживания).</summary>
-        public static Texture2D SaveTexture(string path)
-        {
-            Debug.Assert(Colors.Length == System.Enum.GetValues(typeof(Swatch)).Length, "Палитра и Swatch разошлись");
-
-            var texture = new Texture2D(Columns * CellPixels, Rows * CellPixels, TextureFormat.RGBA32, false)
-            {
-                name = "Palette",
-                filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp,
-            };
-
-            for (int y = 0; y < texture.height; y++)
-            {
-                for (int x = 0; x < texture.width; x++)
-                {
-                    int index = (y / CellPixels) * Columns + x / CellPixels;
-                    texture.SetPixel(x, y, index < Colors.Length ? Colors[index] : Color.magenta);
-                }
-            }
-            texture.Apply(false);
-
-            AssetDatabase.DeleteAsset(path);
-            AssetDatabase.CreateAsset(texture, path);
-            return texture;
-        }
 
         private static Color Hex(int rgb) =>
             new Color(((rgb >> 16) & 0xff) / 255f, ((rgb >> 8) & 0xff) / 255f, (rgb & 0xff) / 255f);
