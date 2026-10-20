@@ -23,7 +23,11 @@ namespace Nuclear.UI
                 wrapMode = TextureWrapMode.Clamp,
                 hideFlags = HideFlags.DontSave,
             };
-            texture.LoadRawTextureData(rgba);
+            // SetPixels32 + Apply(true): мип-уровни Unity построит сама (LoadRawTextureData ждёт их все сразу).
+            var pixels = new Color32[Size * Size];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = new Color32(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2], rgba[i * 4 + 3]);
+            texture.SetPixels32(pixels);
             texture.Apply(true, true);
             Cache[icon] = texture;
             return texture;
