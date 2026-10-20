@@ -19,6 +19,8 @@ namespace Nuclear.Items
             [Min(1)] public int count = 1;
             [Tooltip("Случайно повернуть по вертикали. Выключено для объектов, которые должны стоять ровно (дверь).")]
             public bool randomYaw = true;
+            [Tooltip("Поворот по вертикали для каждой точки (если задан, случайный поворот не используется).")]
+            public float[] yaws = Array.Empty<float>();
         }
 
         [SerializeField] private Entry[] entries = Array.Empty<Entry>();
@@ -40,20 +42,25 @@ namespace Nuclear.Items
         {
             foreach (var entry in entries)
             {
-                var positions = (Vector3[])entry.positions.Clone();
-                Shuffle(positions);
+                // Перемешиваем номера точек, а не сами точки, чтобы поворот остался при своей точке.
+                var order = new int[entry.positions.Length];
+                for (int i = 0; i < order.Length; i++)
+                    order[i] = i;
+                Shuffle(order);
 
-                int count = Mathf.Min(entry.count, positions.Length);
+                int count = Mathf.Min(entry.count, order.Length);
                 for (int i = 0; i < count; i++)
                 {
-                    var rotation = entry.randomYaw ? Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) : Quaternion.identity;
-                    var instance = Instantiate(entry.prefab, positions[i], rotation);
+                    int point = order[i];
+                    var rotation = point < entry.yaws.Length ? Quaternion.Euler(0f, entry.yaws[point], 0f)
+                        : entry.randomYaw ? Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) : Quaternion.identity;
+                    var instance = Instantiate(entry.prefab, entry.positions[point], rotation);
                     instance.GetComponent<NetworkObject>().Spawn(true);
                 }
             }
         }
 
-        private static void Shuffle(Vector3[] array)
+        private static void Shuffle(int[] array)
         {
             for (int i = array.Length - 1; i > 0; i--)
             {

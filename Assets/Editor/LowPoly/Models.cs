@@ -275,9 +275,16 @@ namespace Nuclear.EditorTools.LowPoly
         // ---------- Окружение ----------
 
         /// <summary>Брошенная машина: длина вдоль Z, перед в +Z, опорная точка на земле под центром.</summary>
-        public static void Car(MeshKit k, System.Random random, Swatch paint)
+        /// <summary>
+        /// Брошенная машина, перед — +Z. С openableHood капота нет (его ставит отдельный сетевой CarHood),
+        /// под ним виден моторный отсек, а коллайдер спереди ниже — туда кладётся аккумулятор.
+        /// Такие машины стоят ровно на всех колёсах, чтобы капот совпал с кузовом.
+        /// </summary>
+        public static void Car(MeshKit k, System.Random random, Swatch paint, bool openableHood = false)
         {
             int missingWheel = random.NextDouble() < 0.35 ? random.Next(4) : -1;
+            if (openableHood)
+                missingWheel = -1;
             float tiltX = 0f, tiltZ = 0f;
             if (missingWheel >= 0)
             {
@@ -286,8 +293,23 @@ namespace Nuclear.EditorTools.LowPoly
             }
             k.Push(new Vector3(0f, missingWheel >= 0 ? -0.08f : 0f, 0f), new Vector3(tiltX, 0f, tiltZ));
 
-            k.Box(new Vector3(0f, 0.55f, 0f), new Vector3(1.76f, 0.55f, 4.2f), paint);
-            k.Box(new Vector3(0f, 0.86f, 1.45f), new Vector3(1.7f, 0.08f, 1.2f), Quaternion.Euler(4f, 0f, 0f), paint);
+            if (openableHood)
+            {
+                // Кузов без верха спереди: борта, моторный щит и двигатель в отсеке.
+                k.Box(new Vector3(0f, 0.55f, -0.62f), new Vector3(1.76f, 0.55f, 2.96f), paint);
+                k.Box(new Vector3(0f, 0.36f, 1.48f), new Vector3(1.76f, 0.17f, 1.24f), paint);
+                foreach (float side in new[] { -1f, 1f })
+                    k.Box(new Vector3(0.84f * side, 0.64f, 1.48f), new Vector3(0.08f, 0.38f, 1.24f), paint);
+                k.Box(new Vector3(0f, 0.64f, 2.06f), new Vector3(1.6f, 0.38f, 0.08f), paint);
+                k.Box(new Vector3(0f, 0.6f, 1.25f), new Vector3(0.9f, 0.32f, 0.55f), Swatch.MetalDark);
+                k.Box(new Vector3(0f, 0.8f, 1.25f), new Vector3(0.6f, 0.08f, 0.4f), Swatch.Metal);
+                k.Box(new Vector3(-0.45f, 0.58f, 1.8f), new Vector3(0.5f, 0.08f, 0.3f), Swatch.Rust);
+            }
+            else
+            {
+                k.Box(new Vector3(0f, 0.55f, 0f), new Vector3(1.76f, 0.55f, 4.2f), paint);
+                k.Box(new Vector3(0f, 0.86f, 1.45f), new Vector3(1.7f, 0.08f, 1.2f), Quaternion.Euler(4f, 0f, 0f), paint);
+            }
             k.Box(new Vector3(0f, 0.86f, -1.6f), new Vector3(1.7f, 0.08f, 0.9f), paint);
             k.Frustum(new Vector3(0f, 0.82f, -0.2f), new Vector2(1.66f, 2.1f), new Vector2(1.42f, 1.3f), 0.52f, Swatch.Glass, paint, -0.15f);
             k.Box(new Vector3(0f, 1.348f, -0.35f), new Vector3(1.2f, 0.012f, 1.0f), Swatch.AshLight);
@@ -310,7 +332,7 @@ namespace Nuclear.EditorTools.LowPoly
             }
 
             // Ржавчина на капоте и бортах.
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3 && !openableHood; i++)
                 k.Box(new Vector3(Range(random, -0.6f, 0.6f), 0.905f, Range(random, 0.95f, 1.95f)), new Vector3(Range(random, 0.2f, 0.5f), 0.01f, Range(random, 0.2f, 0.45f)), Swatch.Rust);
             for (int i = 0; i < 4; i++)
             {
@@ -319,7 +341,23 @@ namespace Nuclear.EditorTools.LowPoly
             }
 
             k.Pop();
-            k.AddCollider(new Vector3(0f, 0.72f, 0f), new Vector3(1.8f, 1.3f, 4.25f), Quaternion.identity);
+            if (openableHood)
+            {
+                k.AddCollider(new Vector3(0f, 0.72f, -0.62f), new Vector3(1.8f, 1.3f, 3f), Quaternion.identity);
+                k.AddCollider(new Vector3(0f, 0.42f, 1.48f), new Vector3(1.8f, 0.6f, 1.3f), Quaternion.identity);
+            }
+            else
+            {
+                k.AddCollider(new Vector3(0f, 0.72f, 0f), new Vector3(1.8f, 1.3f, 4.25f), Quaternion.identity);
+            }
+        }
+
+        /// <summary>Капот для CarHood: петли у лобового стекла (начало координат), крышка вперёд по +Z.</summary>
+        public static void CarHoodPanel(MeshKit k, System.Random random, Swatch paint)
+        {
+            k.Box(new Vector3(0f, -0.01f, 0.6f), new Vector3(1.7f, 0.08f, 1.24f), paint);
+            for (int i = 0; i < 3; i++)
+                k.Box(new Vector3(Range(random, -0.6f, 0.6f), 0.035f, Range(random, 0.15f, 1.1f)), new Vector3(Range(random, 0.2f, 0.5f), 0.01f, Range(random, 0.2f, 0.45f)), Swatch.Rust);
         }
 
         /// <summary>Параметры дачного домика.</summary>

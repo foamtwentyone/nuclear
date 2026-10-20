@@ -52,6 +52,7 @@ namespace Nuclear.EditorTools
                 ["crowbarPrefab"] = gear.Crowbar,
                 ["batteryPrefab"] = gear.Battery,
             });
+            root.AddComponent<PlayerPry>();
             root.AddComponent<PlayerHud>();
 
             // Тело с опорной точкой в тазу: так его удобно уронить при смерти (см. PlayerSurvival).
@@ -224,6 +225,38 @@ namespace Nuclear.EditorTools
             });
 
             return SavePrefab(root, "Can");
+        }
+
+        /// <summary>
+        /// Капот одной из машин с аккумулятором: ставится поверх статичной машины (Models.Car с openableHood).
+        /// Петли — у лобового стекла, крышка поднимается вверх. Триггер — чтобы игрок мог «посмотреть» на капот.
+        /// </summary>
+        private static GameObject BuildCarHoodPrefab(Swatch paint, int seed, ItemPrefabs items, GearPrefabs gear)
+        {
+            var root = new GameObject($"Car Hood {seed - 200}");
+            root.AddComponent<NetworkObject>();
+
+            var trigger = root.AddComponent<BoxCollider>();
+            trigger.isTrigger = true;
+            trigger.center = new Vector3(0f, 0.9f, 1.48f);
+            trigger.size = new Vector3(1.8f, 0.35f, 1.3f);
+
+            var hinge = new GameObject("Hinge");
+            hinge.transform.SetParent(root.transform, false);
+            hinge.transform.localPosition = new Vector3(0f, 0.9f, 0.86f);
+            var kit = new MeshKit();
+            Models.CarHoodPanel(kit, new System.Random(seed), paint);
+            AddModel(hinge.transform, "Panel", kit, Vector3.zero, Quaternion.identity);
+
+            Configure(root.AddComponent<CarHood>(), new Dictionary<string, object>
+            {
+                ["batteryPrefab"] = items.Battery,
+                ["filterPrefab"] = items.Filter,
+                ["bandagePrefab"] = gear.Bandage,
+                ["cellPrefab"] = gear.Battery,
+            });
+
+            return SavePrefab(root, $"Car Hood {seed - 200}");
         }
 
         /// <summary>Снаряжение для кармана: маленький физический предмет с GearPickup.</summary>

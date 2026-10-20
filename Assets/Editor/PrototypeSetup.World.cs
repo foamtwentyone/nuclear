@@ -31,6 +31,22 @@ namespace Nuclear.EditorTools
         private static readonly Vector2 WeakSpotCenter = new(-14f, -10f);
 
         // Точки появления предметов и Слепыша: рядом с ними ничего не ставим.
+        /// <summary>Машины, у которых вскрывается капот (CarHood): где стоят, куда смотрят, какого цвета.</summary>
+        private struct HoodCar
+        {
+            public Vector2 Position;
+            public float Yaw;
+            public Swatch Paint;
+            public int Seed;
+        }
+
+        private static readonly HoodCar[] HoodCars =
+        {
+            new() { Position = new Vector2(-8f, 9f), Yaw = 90f, Paint = Swatch.PaintRed, Seed = 201 },
+            new() { Position = new Vector2(13.5f, 8.5f), Yaw = 80f, Paint = Swatch.PaintBlue, Seed = 202 },
+            new() { Position = new Vector2(10.5f, -8f), Yaw = 20f, Paint = Swatch.PaintBeige, Seed = 203 },
+        };
+
         private static readonly Vector3[] BatterySpawns = { new(8f, 0.3f, -6f), new(-8f, 0.3f, 12f), new(12f, 0.3f, 10f) };
         private static readonly Vector3[] CrateSpawns = { new(2f, 0.4f, 4f), new(3f, 0.4f, 4.5f), new(-3f, 0.4f, 3f) };
         private static readonly Vector3[] CanSpawns = { new(1f, 0.2f, 2f), new(1.4f, 0.2f, 2.3f), new(-1f, 0.2f, 2.5f), new(-1.5f, 0.2f, 1.8f), new(0f, 0.2f, 3f) };
@@ -77,7 +93,8 @@ namespace Nuclear.EditorTools
             manager.NetworkConfig.PlayerPrefab = playerPrefab;
             manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
             manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter, items.BlindOne, items.Door,
-                items.Gear.Bandage, items.Gear.Flashlight, items.Gear.Crowbar, items.Gear.Battery));
+                items.Gear.Bandage, items.Gear.Flashlight, items.Gear.Crowbar, items.Gear.Battery,
+                items.Hoods[0], items.Hoods[1], items.Hoods[2]));
             networkObject.AddComponent<ConnectionMenu>();
 
             BuildSpawner(items);
@@ -99,11 +116,10 @@ namespace Nuclear.EditorTools
 
         private static void BuildSpawner(ItemPrefabs items)
         {
-            // Аккумулятор один, в случайной из трёх точек у машин; ящики и консервы в шлюзе.
+            // Аккумулятор — под капотом одной из трёх машин (CarHood); ящики и консервы в шлюзе.
             var spawner = new GameObject("Item Spawner").AddComponent<ItemSpawner>();
             spawner.SetEntries(new[]
             {
-                new ItemSpawner.Entry { prefab = items.Battery, positions = BatterySpawns, count = 1 },
                 new ItemSpawner.Entry { prefab = items.Crate, positions = CrateSpawns, count = 3 },
                 new ItemSpawner.Entry { prefab = items.Can, positions = CanSpawns, count = 5 },
                 // Один из вариантов — в центре воронки: фильтр за дозу.
@@ -111,6 +127,9 @@ namespace Nuclear.EditorTools
                 // Слепыш начинает в дальней части карты, подальше от шлюза.
                 new ItemSpawner.Entry { prefab = items.BlindOne, positions = BlindOneSpawns, count = 1 },
                 new ItemSpawner.Entry { prefab = items.Door, positions = new[] { DoorPosition }, count = 1, randomYaw = false },
+                new ItemSpawner.Entry { prefab = items.Hoods[0], positions = new[] { OnGround(HoodCars[0].Position.x, HoodCars[0].Position.y) }, yaws = new[] { HoodCars[0].Yaw }, count = 1 },
+                new ItemSpawner.Entry { prefab = items.Hoods[1], positions = new[] { OnGround(HoodCars[1].Position.x, HoodCars[1].Position.y) }, yaws = new[] { HoodCars[1].Yaw }, count = 1 },
+                new ItemSpawner.Entry { prefab = items.Hoods[2], positions = new[] { OnGround(HoodCars[2].Position.x, HoodCars[2].Position.y) }, yaws = new[] { HoodCars[2].Yaw }, count = 1 },
                 new ItemSpawner.Entry { prefab = items.Gear.Bandage, positions = TableBandages, count = TableBandages.Length },
                 new ItemSpawner.Entry { prefab = items.Gear.Flashlight, positions = TableFlashlights, count = TableFlashlights.Length },
                 new ItemSpawner.Entry { prefab = items.Gear.Crowbar, positions = TableCrowbar, count = 1, randomYaw = false },
@@ -506,19 +525,18 @@ namespace Nuclear.EditorTools
 
         private static void BuildCars(Transform level)
         {
-            // Машины у трёх точек появления аккумулятора: «он в одной из машин».
-            PlaceCar(level, new Vector2(-8f, 9f), 90f, Swatch.PaintRed, 201);
-            PlaceCar(level, new Vector2(13.5f, 8.5f), 80f, Swatch.PaintBlue, 202);
-            PlaceCar(level, new Vector2(10.5f, -8f), 20f, Swatch.PaintBeige, 203);
+            // Три машины с открывающимся капотом: под одним из них аккумулятор.
+            foreach (var spot in HoodCars)
+                PlaceCar(level, new Vector2(spot.Position.x, spot.Position.y), spot.Yaw, spot.Paint, spot.Seed, openableHood: true);
             PlaceCar(level, new Vector2(-21f, 11f), 100f, Swatch.PaintGreen, 204);
             PlaceCar(level, new Vector2(3f, 11.5f), 260f, Swatch.PaintBeige, 205);
             PlaceCar(level, new Vector2(24f, 9.5f), 95f, Swatch.PaintRed, 206);
         }
 
-        private static void PlaceCar(Transform level, Vector2 position, float yaw, Swatch paint, int seed)
+        private static void PlaceCar(Transform level, Vector2 position, float yaw, Swatch paint, int seed, bool openableHood = false)
         {
             var kit = new MeshKit();
-            Models.Car(kit, new System.Random(seed), paint);
+            Models.Car(kit, new System.Random(seed), paint, openableHood);
             MarkStatic(AddModel(level, $"Car {seed - 200}", kit, OnGround(position.x, position.y), Quaternion.Euler(0f, yaw, 0f)));
             blockedCircles.Add(new Vector3(position.x, position.y, 3f));
         }

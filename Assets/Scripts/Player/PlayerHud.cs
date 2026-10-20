@@ -22,6 +22,7 @@ namespace Nuclear.Player
         private PlayerVoice voice;
         private PlayerGhost ghost;
         private PlayerGear gear;
+        private PlayerPry pry;
         private GUIStyle hintStyle;
         private GUIStyle statusStyle;
         private GUIStyle deathStyle;
@@ -37,6 +38,7 @@ namespace Nuclear.Player
             voice = GetComponent<PlayerVoice>();
             ghost = GetComponent<PlayerGhost>();
             gear = GetComponent<PlayerGear>();
+            pry = GetComponent<PlayerPry>();
         }
 
         private void OnGUI()
@@ -271,8 +273,27 @@ namespace Nuclear.Player
                     hint = $"E — взять: {target.DisplayName}{ChargeText(target)}";
             }
 
+            if (hint == null && pry != null && pry.LookHood is { } hood)
+                hint = HoodHint(hood);
+
             if (hint != null)
                 GUI.Label(new Rect(0f, Screen.height / 2f + 30f, Screen.width, 50f), hint, hintStyle);
+        }
+
+        private string HoodHint(CarHood hood)
+        {
+            bool crowbar = gear != null && gear.HasCrowbar.Value;
+            string hint;
+            if (hood.PryerCount.Value == 0)
+                hint = crowbar ? "Держите E — вскрыть капот ломом (громко!)" : "Держите E вдвоём — вскрыть капот (без лома)";
+            else if (hood.WithCrowbar.Value || hood.PryerCount.Value >= 2)
+                hint = hood.WithCrowbar.Value ? "Вскрываете ломом… Слепыш слышит за 15 м" : "Вскрываете вдвоём…";
+            else
+                hint = "<color=#e6b84d>Одному без лома не открыть — нужен второй игрок</color>";
+
+            if (hood.Progress.Value > 0f)
+                DrawBar(Screen.height / 2f + 84f, hood.Progress.Value, 1f, new Color(0.85f, 0.85f, 0.75f));
+            return hint;
         }
 
         private static string ChargeText(PhysicsItem item) =>
