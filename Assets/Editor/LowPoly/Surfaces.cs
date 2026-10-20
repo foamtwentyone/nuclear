@@ -9,7 +9,7 @@ namespace Nuclear.EditorTools.LowPoly
     }
 
     /// <summary>
-    /// Процедурные текстуры для low-poly моделей: цвет (с узором) и карта нормалей (рельеф).
+    /// Процедурные текстуры для low-poly моделей в мультяшном стиле: цвет (с простым узором) и лёгкий рельеф.
     /// Все узоры бесшовно тайлятся. Генерация — чистая математика над массивами пикселей,
     /// без API Unity, чтобы её можно было запускать и проверять вне редактора.
     /// </summary>
@@ -45,38 +45,27 @@ namespace Nuclear.EditorTools.LowPoly
             Surface.Bark => 1f,
             Surface.Brick => 1.2f,
             Surface.Paint => 1f,
-            Surface.Fabric => 0.35f,
+            Surface.Fabric => 1f,
             Surface.Fur => 0.6f,
             Surface.Skin => 0.6f,
             _ => 0.5f,
         };
 
-        public static int Resolution(Surface surface) =>
-            surface is Surface.Ground or Surface.Asphalt or Surface.Concrete ? 256 : 128;
+        public static int Resolution(Surface surface) => 128;
 
         public static float Smoothness(Swatch swatch) => swatch switch
         {
-            Swatch.Glass or Swatch.Lens => 0.7f,
-            Swatch.Mouth or Swatch.NosePink => 0.45f,
-            _ => Of(swatch) switch
-            {
-                Surface.Metal => 0.4f,
-                Surface.Paint => 0.3f,
-                Surface.Skin => 0.2f,
-                Surface.Plain => 0.2f,
-                _ => 0.05f,
-            },
+            Swatch.Glass or Swatch.Lens => 0.6f,
+            Swatch.NosePink or Swatch.Mouth => 0.35f,
+            _ => Of(swatch) == Surface.Metal ? 0.3f : 0.05f,
         };
 
         private static float NormalStrength(Surface surface) => surface switch
         {
-            Surface.Brick => 3f,
-            Surface.Ground or Surface.Rust or Surface.Bark => 2f,
-            Surface.Concrete or Surface.Asphalt or Surface.Fur => 1.5f,
-            Surface.Wood => 1f,
-            Surface.Metal => 0.8f,
-            Surface.Plain => 0.5f,
-            _ => 1f,
+            Surface.Brick => 1.5f,
+            Surface.Wood or Surface.Ground or Surface.Bark => 0.8f,
+            Surface.Concrete or Surface.Paint or Surface.Fur => 0.5f,
+            _ => 0.2f,
         };
 
         /// <summary>Цвет «вкраплений»: трещины, ржавчина под краской, лишайник, раствор между кирпичами.</summary>
@@ -147,152 +136,127 @@ namespace Nuclear.EditorTools.LowPoly
 
         /// <summary>
         /// Узор поверхности в точке (u, v) тайла: высота для рельефа, множитель яркости
-        /// и доля цвета-вкрапления.
+        /// и доля цвета-вкрапления. Стиль — мультяшный, «нарисованный»: крупные мягкие пятна
+        /// с двумя-тремя ступенями тона, чистые простые формы (доски, кирпичи, сколы), почти без мелкого шума.
         /// </summary>
         private static void Sample(Surface surface, float u, float v, out float height, out float shade, out float accent)
         {
+            // Общая основа: крупное мягкое пятно, разбитое на ступени тона, как мазки кистью.
+            float wash = Bands(Fbm(u, v, 2, 2, 2, 1), 3);
+            shade = 0.94f + 0.1f * wash;
+            height = 0.5f;
             accent = 0f;
+
             switch (surface)
             {
                 case Surface.Ground:
                 {
-                    float soil = Fbm(u, v, 4, 4, 5, 11);
-                    Cells(u, v, 18, 12, out float nearest, out _, out float pebbleSeed);
-                    float radius = 0.15f + 0.25f * pebbleSeed;
-                    float pebble = nearest < radius ? Mathf.Sqrt(1f - nearest / radius) : 0f;
-                    // Трещины высохшей грязи — пятнами, а не сеткой по всей земле.
-                    Cells(u, v, 7, 13, out float crackNear, out float crackSecond, out _);
-                    float crack = (1f - SmoothStep(0f, 0.035f, crackSecond - crackNear)) * SmoothStep(0.5f, 0.68f, Fbm(u, v, 3, 3, 3, 14));
-                    height = soil * 0.6f + pebble * 0.5f - crack * 0.3f;
-                    shade = 0.8f + 0.35f * soil + (pebbleSeed - 0.45f) * 0.7f * pebble;
-                    accent = crack * 0.6f;
+                    // Редкие круглые камешки: светлая шапка и тёмный ободок.
+                    Cells(u, v, 9, 12, out float nearest, out _, out float stone);
+                    float radius = stone > 0.55f ? 0.18f + 0.12f * stone : 0f;
+                    float pebble = nearest < radius ? 1f : 0f;
+                    float rim = nearest < radius + 0.05f && nearest >= radius ? 1f : 0f;
+                    shade = 0.92f + 0.14f * Bands(Fbm(u, v, 3, 3, 2, 11), 3) + 0.14f * pebble - 0.2f * rim;
+                    height = 0.5f + 0.4f * pebble;
                     break;
                 }
                 case Surface.Asphalt:
                 {
-                    float grain = Fbm(u, v, 32, 32, 3, 21);
-                    Cells(u, v, 60, 22, out float nearest, out _, out float stoneSeed);
-                    float stone = nearest < 0.3f ? 1f - nearest / 0.3f : 0f;
-                    Cells(u, v, 5, 23, out float crackNear, out float crackSecond, out _);
-                    float crack = (1f - SmoothStep(0f, 0.025f, crackSecond - crackNear)) * SmoothStep(0.55f, 0.7f, Fbm(u, v, 2, 2, 3, 24));
-                    height = grain * 0.5f + stone * 0.5f - crack * 0.4f;
-                    shade = 0.85f + 0.2f * grain + 0.6f * stone * (stoneSeed - 0.3f);
-                    accent = crack * 0.7f;
+                    Cells(u, v, 14, 22, out float nearest, out _, out float speck);
+                    float dot = speck > 0.7f && nearest < 0.12f ? 1f : 0f;
+                    shade += 0.18f * dot;
                     break;
                 }
                 case Surface.Concrete:
                 {
-                    float blotch = Fbm(u, v, 3, 3, 4, 31);
-                    float grain = Fbm(u, v, 48, 48, 2, 32);
-                    Cells(u, v, 40, 33, out float nearest, out _, out float poreSeed);
-                    float pore = nearest < 0.15f * poreSeed ? 1f : 0f;
-                    // Следы стыков опалубки: тонкая линия у краёв каждой четверти тайла.
-                    float line = SmoothStep(0.47f, 0.49f, Mathf.Abs(Frac(v * 4f) - 0.5f));
-                    height = 0.5f + 0.2f * grain - 0.4f * pore - 0.3f * line;
-                    shade = 0.82f + 0.25f * blotch + 0.08f * grain - 0.3f * pore - 0.08f * line;
-                    accent = SmoothStep(0.58f, 0.8f, Fbm(u, v, 3, 2, 5, 34)) * 0.35f;
+                    // Чистые стыки опалубки и одно-два мягких пятна сырости.
+                    float seam = SmoothStep(0.475f, 0.485f, Mathf.Abs(Frac(v * 2f) - 0.5f));
+                    float damp = Bands(SmoothStep(0.55f, 0.75f, Fbm(u, v, 2, 2, 3, 34)), 2);
+                    shade = 0.95f + 0.07f * wash - 0.1f * seam;
+                    height = 0.5f - 0.3f * seam;
+                    accent = damp * 0.25f;
                     break;
                 }
                 case Surface.Metal:
                 {
-                    float brushed = Fbm(u, v, 2, 40, 3, 41);
-                    float scratch = Scratches(u, v, 14, 42);
-                    height = brushed * 0.3f - scratch * 0.3f;
-                    shade = 0.85f + 0.2f * brushed + 0.25f * scratch;
-                    accent = SmoothStep(0.72f, 0.9f, Fbm(u, v, 4, 4, 4, 43)) * 0.7f;
+                    // Пара стилизованных бликов-полос вместо шлифовки и царапин.
+                    // Целые коэффициенты при u и v — полосы стыкуются между копиями тайла.
+                    float streak = SmoothStep(0.93f, 0.96f, Mathf.Sin((u * 2f + v) * 2f * Mathf.PI) * 0.5f + 0.5f);
+                    shade = 0.92f + 0.08f * wash + 0.12f * streak;
+                    accent = Bands(SmoothStep(0.65f, 0.8f, Fbm(u, v, 3, 3, 2, 43)), 2) * 0.6f;
                     break;
                 }
                 case Surface.Rust:
                 {
-                    float coarse = Fbm(u, v, 4, 4, 5, 51);
-                    float flakes = Fbm(u, v, 12, 12, 3, 52);
-                    Cells(u, v, 30, 53, out float nearest, out _, out _);
-                    float pit = nearest < 0.25f ? 1f - nearest / 0.25f : 0f;
-                    height = coarse * 0.5f + flakes * 0.3f - pit * 0.4f;
-                    shade = 0.7f + 0.5f * coarse - 0.2f * pit;
-                    accent = SmoothStep(0.45f, 0.8f, flakes);
+                    // Два тона с чёткой границей, как заливка в мультфильме.
+                    accent = Bands(SmoothStep(0.45f, 0.6f, Fbm(u, v, 4, 4, 3, 52)), 2) * 0.7f;
                     break;
                 }
                 case Surface.Wood:
                 {
-                    float warp = Fbm(u, v, 3, 3, 3, 61);
-                    float grain = 0.5f + 0.5f * Mathf.Sin((u * 24f + warp * 0.8f) * 2f * Mathf.PI);
-                    float fibres = Fbm(u, v, 64, 4, 3, 62);
+                    // Несколько тёмных волнистых линий волокон на ровной доске.
+                    float wave = Mathf.Sin(v * 2f * Mathf.PI * 2f + Hash(Mathf.FloorToInt(u * 6f), 0, 61) * 6f) * 0.03f;
+                    float line = 1f - SmoothStep(0.02f, 0.04f, Mathf.Abs(Frac(u * 6f + wave) - 0.5f));
                     Cells(u, v, 3, 63, out float nearest, out _, out float knotSeed);
-                    float knot = knotSeed > 0.6f && nearest < 0.12f ? 1f - nearest / 0.12f : 0f;
-                    height = grain * 0.5f + fibres * 0.3f - knot * 0.3f;
-                    shade = 0.8f + 0.12f * grain + 0.14f * fibres;
-                    accent = knot * 0.6f;
+                    float knot = knotSeed > 0.6f && nearest < 0.08f ? 1f : 0f;
+                    shade = 0.95f + 0.08f * wash - 0.16f * line;
+                    height = 0.5f - 0.3f * line - 0.3f * knot;
+                    accent = knot * 0.55f;
                     break;
                 }
                 case Surface.Bark:
                 {
-                    float ridges = Fbm(u, v, 12, 2, 4, 71);
-                    float grooves = SmoothStep(0.3f, 0.7f, ridges);
-                    height = grooves;
-                    shade = 0.55f + 0.6f * grooves;
-                    accent = SmoothStep(0.68f, 0.85f, Fbm(u, v, 16, 16, 3, 72)) * 0.35f * grooves;
+                    // Вертикальные полосы коры двух тонов.
+                    float stripes = Bands(Fbm(u, v, 8, 1, 2, 71), 2);
+                    shade = 0.8f + 0.3f * stripes;
+                    height = stripes;
                     break;
                 }
                 case Surface.Brick:
                 {
-                    const int rows = 8, perRow = 3;
+                    const int rows = 6, perRow = 3;
                     float rowF = v * rows;
                     int row = Mathf.FloorToInt(rowF);
                     float shifted = u * perRow + (row % 2) * 0.5f;
                     int column = Mathf.FloorToInt(shifted);
                     float inRowU = Frac(shifted), inRowV = Frac(rowF);
-                    bool mortar = inRowU < 0.04f || inRowU > 0.96f || inRowV < 0.08f || inRowV > 0.92f;
-                    float brickTone = Hash(((column % perRow) + perRow) % perRow, row % rows, 81);
-                    float grain = Fbm(u, v, 24, 24, 2, 82);
-                    height = mortar ? 0.2f : 0.8f + 0.1f * grain;
-                    shade = 0.85f + 0.3f * (brickTone - 0.5f) + 0.1f * grain;
+                    bool mortar = inRowU < 0.05f || inRowU > 0.95f || inRowV < 0.1f || inRowV > 0.9f;
+                    float tone = Hash(((column % perRow) + perRow) % perRow, row % rows, 81);
+                    shade = 0.92f + 0.14f * Bands(tone, 3);
+                    height = mortar ? 0.2f : 0.8f;
                     accent = mortar ? 1f : 0f;
                     break;
                 }
                 case Surface.Paint:
                 {
-                    float body = Fbm(u, v, 6, 6, 4, 91);
-                    float chip = SmoothStep(0.7f, 0.74f, Fbm(u, v, 16, 16, 3, 92));
-                    height = 0.6f - 0.4f * chip + 0.05f * body;
-                    shade = 0.9f + 0.12f * body;
+                    // Редкие крупные сколы с чистым краем.
+                    float chip = SmoothStep(0.76f, 0.78f, Fbm(u, v, 4, 4, 2, 92));
+                    height = 0.6f - 0.3f * chip;
                     accent = chip;
-                    break;
-                }
-                case Surface.Fabric:
-                {
-                    float weave = Mathf.Sin(u * 2f * Mathf.PI * 32f) * Mathf.Sin(v * 2f * Mathf.PI * 32f);
-                    float dirt = Fbm(u, v, 4, 4, 3, 101);
-                    height = 0.5f + 0.3f * weave;
-                    shade = 0.85f + 0.08f * weave + 0.15f * dirt;
                     break;
                 }
                 case Surface.Fur:
                 {
-                    float strands = Fbm(u, v, 48, 6, 3, 111);
-                    float clumps = Fbm(u, v, 4, 4, 3, 112);
-                    height = strands;
-                    shade = 0.7f + 0.45f * strands * (0.7f + 0.3f * clumps);
+                    // Пучки шерсти: короткие тёмные штрихи, как нарисованные.
+                    float strokes = Bands(Fbm(u, v, 16, 4, 2, 111), 3);
+                    shade = 0.88f + 0.2f * strokes;
+                    height = strokes;
                     break;
                 }
                 case Surface.Skin:
                 {
-                    float mottle = Fbm(u, v, 4, 4, 4, 121);
-                    Cells(u, v, 50, 122, out float nearest, out _, out _);
-                    float pore = nearest < 0.2f ? 1f - nearest / 0.2f : 0f;
-                    height = 0.5f + 0.2f * mottle - 0.3f * pore;
-                    shade = 0.85f + 0.2f * mottle - 0.15f * pore;
-                    accent = SmoothStep(0.65f, 0.85f, Fbm(u, v, 3, 3, 3, 123)) * 0.5f;
-                    break;
-                }
-                default:
-                {
-                    float noise = Fbm(u, v, 6, 6, 3, 131);
-                    height = 0.5f + 0.1f * noise;
-                    shade = 0.93f + 0.1f * noise;
+                    accent = Bands(SmoothStep(0.62f, 0.78f, Fbm(u, v, 3, 3, 2, 123)), 2) * 0.35f;
                     break;
                 }
             }
+        }
+
+        /// <summary>Разбивает плавное значение 0..1 на levels ступеней с мягкими краями — «мультяшный» тон.</summary>
+        private static float Bands(float value, int levels)
+        {
+            float scaled = Mathf.Clamp01(value) * levels;
+            float step = Mathf.Floor(scaled);
+            return Mathf.Clamp01((step + SmoothStep(0.4f, 0.6f, scaled - step)) / levels);
         }
 
         // ---------- Бесшовный шум ----------
@@ -378,27 +342,6 @@ namespace Nuclear.EditorTools.LowPoly
                     }
                 }
             }
-        }
-
-        /// <summary>Тонкие светлые царапины: несколько случайных отрезков по тайлу.</summary>
-        private static float Scratches(float u, float v, int count, int seed)
-        {
-            float result = 0f;
-            for (int i = 0; i < count; i++)
-            {
-                float ax = Hash(i, 0, seed), ay = Hash(i, 1, seed);
-                float angle = Hash(i, 2, seed) * Mathf.PI;
-                float length = 0.1f + 0.3f * Hash(i, 3, seed);
-                float dx = Mathf.Cos(angle), dy = Mathf.Sin(angle);
-                // Ближайшая копия начала отрезка с учётом тайлинга.
-                float rx = u - ax, ry = v - ay;
-                rx -= Mathf.Round(rx);
-                ry -= Mathf.Round(ry);
-                float along = Mathf.Clamp(rx * dx + ry * dy, 0f, length);
-                float distance = Mathf.Sqrt((rx - dx * along) * (rx - dx * along) + (ry - dy * along) * (ry - dy * along));
-                result = Mathf.Max(result, 1f - SmoothStep(0f, 0.004f, distance));
-            }
-            return result;
         }
     }
 }

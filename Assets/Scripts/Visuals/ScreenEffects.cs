@@ -10,7 +10,7 @@ namespace Nuclear.Visuals
     /// </summary>
     public class ScreenEffects : MonoBehaviour
     {
-        [SerializeField, Range(0f, 1f)] private float baseVignette = 0.3f;
+        [SerializeField, Range(0f, 1f)] private float baseVignette = 0.2f;
         [SerializeField, Range(0f, 1f)] private float suffocatingVignette = 0.9f;
         [SerializeField] private float damageFlashTime = 0.6f;
 

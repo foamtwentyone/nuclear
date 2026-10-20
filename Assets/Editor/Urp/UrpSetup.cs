@@ -57,8 +57,8 @@ namespace Nuclear.EditorTools.Urp
         }
 
         /// <summary>
-        /// Глобальная постобработка: плёночная тональная кривая, тёплые света и холодные тени,
-        /// мягкое свечение огня и радиации, лёгкая виньетка и зерно.
+        /// Глобальная постобработка в мультяшном духе: мягкая тональная кривая, чуть сочнее цвета,
+        /// тёплые света и холодные тени, мягкое свечение огня и радиации, лёгкая виньетка.
         /// </summary>
         public static void AddPostProcessing()
         {
@@ -68,12 +68,12 @@ namespace Nuclear.EditorTools.Urp
             AssetDatabase.CreateAsset(profile, path);
 
             var tonemapping = AddOverride<Tonemapping>(profile);
-            tonemapping.mode.Override(TonemappingMode.ACES);
+            tonemapping.mode.Override(TonemappingMode.Neutral);
 
             var color = AddOverride<ColorAdjustments>(profile);
-            color.postExposure.Override(0.3f);
-            color.contrast.Override(14f);
-            color.saturation.Override(-8f);
+            color.postExposure.Override(0.25f);
+            color.contrast.Override(8f);
+            color.saturation.Override(12f);
 
             AddOverride<WhiteBalance>(profile).temperature.Override(6f);
 
@@ -82,17 +82,13 @@ namespace Nuclear.EditorTools.Urp
             tones.highlights.Override(new Vector4(1.04f, 1f, 0.95f, 0f));
 
             var bloom = AddOverride<Bloom>(profile);
-            bloom.intensity.Override(0.7f);
+            bloom.intensity.Override(0.5f);
             bloom.threshold.Override(1f);
             bloom.scatter.Override(0.65f);
 
             var vignette = AddOverride<Vignette>(profile);
-            vignette.intensity.Override(0.22f);
+            vignette.intensity.Override(0.15f);
             vignette.smoothness.Override(0.5f);
-
-            var grain = AddOverride<FilmGrain>(profile);
-            grain.type.Override(FilmGrainLookup.Thin1);
-            grain.intensity.Override(0.2f);
 
             AssetDatabase.SaveAssets();
 

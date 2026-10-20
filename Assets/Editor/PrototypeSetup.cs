@@ -27,7 +27,7 @@ namespace Nuclear.EditorTools
         private const string NetworkPrefabsPath = PrefabFolder + "/NetworkPrefabs.asset";
 
         /// <summary>Цвет пепельной дымки: им же заливается фон камер, чтобы горизонт растворялся в тумане.</summary>
-        private static readonly Color FogColor = new(0.58f, 0.55f, 0.5f);
+        private static readonly Color FogColor = new(0.66f, 0.62f, 0.55f);
 
         private const string SurfaceMaterialFolder = MaterialFolder + "/Surfaces";
         private const string TextureFolder = GeneratedFolder + "/Textures";

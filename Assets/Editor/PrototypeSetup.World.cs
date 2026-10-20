@@ -111,19 +111,20 @@ namespace Nuclear.EditorTools
             var sun = new GameObject("Sun").AddComponent<Light>();
             sun.type = LightType.Directional;
             sun.color = new Color(1f, 0.87f, 0.7f);
-            sun.intensity = 1.05f;
+            sun.intensity = 1.2f;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.8f;
+            // Мягкие тени, как в мультяшных играх: форму видно, но без глухой черноты.
+            sun.shadowStrength = 0.6f;
             sun.transform.rotation = Quaternion.Euler(32f, -35f, 0f);
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.44f, 0.47f, 0.53f);
-            RenderSettings.ambientEquatorColor = new Color(0.42f, 0.4f, 0.37f);
-            RenderSettings.ambientGroundColor = new Color(0.22f, 0.2f, 0.18f);
+            RenderSettings.ambientSkyColor = new Color(0.52f, 0.56f, 0.64f);
+            RenderSettings.ambientEquatorColor = new Color(0.5f, 0.47f, 0.43f);
+            RenderSettings.ambientGroundColor = new Color(0.3f, 0.27f, 0.24f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Exponential;
-            RenderSettings.fogDensity = 0.025f;
+            RenderSettings.fogDensity = 0.022f;
             RenderSettings.fogColor = FogColor;
             RenderSettings.sun = sun;
 

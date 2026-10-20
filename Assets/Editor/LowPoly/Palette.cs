@@ -55,7 +55,20 @@ namespace Nuclear.EditorTools.LowPoly
             Hex(0x7a6450), Hex(0x47382c), Hex(0xb3a185), Hex(0xc98a86), Hex(0x8c5556), Hex(0xd9c58f),
         };
 
-        public static Color ColorOf(Swatch swatch) => Colors[(int)swatch];
+        /// <summary>
+        /// Цвет для мультяшного стиля: исходный цвет чуть насыщеннее и светлее
+        /// (как в Content Warning или Peak), но всё ещё выгоревший.
+        /// </summary>
+        public static Color ColorOf(Swatch swatch)
+        {
+            var c = Colors[(int)swatch];
+            float luminance = c.r * 0.3f + c.g * 0.59f + c.b * 0.11f;
+            const float saturation = 1.25f, brightness = 1.08f;
+            return new Color(
+                Mathf.Clamp01((luminance + (c.r - luminance) * saturation) * brightness),
+                Mathf.Clamp01((luminance + (c.g - luminance) * saturation) * brightness),
+                Mathf.Clamp01((luminance + (c.b - luminance) * saturation) * brightness));
+        }
 
         private static Color Hex(int rgb) =>
             new Color(((rgb >> 16) & 0xff) / 255f, ((rgb >> 8) & 0xff) / 255f, (rgb & 0xff) / 255f);
