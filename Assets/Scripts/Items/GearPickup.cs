@@ -2,17 +2,19 @@ using UnityEngine;
 
 namespace Nuclear.Items
 {
-    /// <summary>Снаряжение, которое уходит в карман (PlayerGear), а не в руки.</summary>
+    /// <summary>Мелкий предмет, который кладётся в любую ячейку инвентаря (PlayerGear).</summary>
     public enum GearKind : byte
     {
         Bandage,
         Flashlight,
         Crowbar,
         FlashlightBattery,
+        Filter,
+        Can,
     }
 
     /// <summary>
-    /// Помечает предмет как снаряжение: E кладёт его в карман, если там есть место.
+    /// Помечает предмет как мелкий: E кладёт его в инвентарь, если есть свободная ячейка.
     /// Иначе его можно нести и бросать как обычный предмет.
     /// </summary>
     [RequireComponent(typeof(PhysicsItem))]
@@ -24,5 +26,16 @@ namespace Nuclear.Items
         public float Charge { get; set; } = -1f;
 
         public GearKind Kind => kind;
+
+        public static string NameOf(GearKind kind) => kind switch
+        {
+            GearKind.Bandage => "Бинт",
+            GearKind.Flashlight => "Фонарь",
+            GearKind.Crowbar => "Лом",
+            GearKind.FlashlightBattery => "Батарейка",
+            GearKind.Filter => "Фильтр",
+            GearKind.Can => "Консерва",
+            _ => kind.ToString(),
+        };
     }
 }

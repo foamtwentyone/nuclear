@@ -3,7 +3,6 @@ using Nuclear.Hazards;
 using Nuclear.Noise;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Nuclear.Player
 {
@@ -17,8 +16,6 @@ namespace Nuclear.Player
     {
         [Header("Противогаз")]
         [SerializeField] private float filterDuration = 240f;
-        [SerializeField] private int startSpareFilters;
-        [SerializeField] private int maxSpareFilters = 3;
         [Tooltip("Сколько секунд игрок без фильтра, пока меняет его.")]
         [SerializeField] private float filterSwapTime = 3f;
         [SerializeField] private float suffocationDamagePerSecond = 4f;
@@ -33,7 +30,6 @@ namespace Nuclear.Player
         [SerializeField] private float maxHealthPerDose = 1f;
 
         public readonly NetworkVariable<float> FilterTime = new();
-        public readonly NetworkVariable<int> SpareFilters = new();
         public readonly NetworkVariable<bool> IsSwappingFilter = new();
         public readonly NetworkVariable<float> Health = new();
         public readonly NetworkVariable<float> Dose = new();
@@ -41,7 +37,6 @@ namespace Nuclear.Player
         public float FilterDuration => filterDuration;
         public float MaxHealth => Mathf.Max(minMaxHealth, baseMaxHealth - Dose.Value * maxHealthPerDose);
         public bool IsDead => IsSpawned && Health.Value <= 0f;
-        public bool HasPocketSpace => SpareFilters.Value < maxSpareFilters;
 
         /// <summary>Чистый ли воздух вокруг. Зоны есть у всех, поэтому считается локально.</summary>
         public bool InSafeAir => SafeAirZone.Contains(BreathPoint);
@@ -65,7 +60,6 @@ namespace Nuclear.Player
             if (IsServer)
             {
                 FilterTime.Value = filterDuration;
-                SpareFilters.Value = startSpareFilters;
                 Health.Value = baseMaxHealth;
             }
 
@@ -76,16 +70,6 @@ namespace Nuclear.Player
         public override void OnNetworkDespawn()
         {
             Health.OnValueChanged -= OnHealthChanged;
-        }
-
-        /// <summary>Сервер: кладёт подобранный фильтр в карман, если есть место.</summary>
-        public bool TryStashFilter()
-        {
-            if (IsDead || !HasPocketSpace)
-                return false;
-
-            SpareFilters.Value++;
-            return true;
         }
 
         /// <summary>Сервер: лечит, но не выше максимума, срезанного радиацией. Мёртвых не поднимает.</summary>
@@ -113,11 +97,6 @@ namespace Nuclear.Player
 
             if (IsServer && !IsDead)
                 ServerTick(Time.deltaTime);
-
-            if (IsOwner && !IsDead && Cursor.lockState == CursorLockMode.Locked
-                && Keyboard.current is { } keyboard && keyboard.rKey.wasPressedThisFrame
-                && SpareFilters.Value > 0 && !IsSwappingFilter.Value)
-                SwapFilterRpc();
         }
 
         private void ServerTick(float deltaTime)
@@ -155,17 +134,19 @@ namespace Nuclear.Player
             }
         }
 
-        /// <summary>Старый фильтр выкидывается сразу, новый встаёт через несколько секунд.</summary>
-        [Rpc(SendTo.Server, RequireOwnership = true)]
-        private void SwapFilterRpc()
+        /// <summary>
+        /// Сервер: начать смену фильтра (новый фильтр берёт PlayerGear из инвентаря).
+        /// Старый выкидывается сразу, новый встаёт через несколько секунд.
+        /// </summary>
+        public bool BeginFilterSwap()
         {
-            if (IsDead || IsSwappingFilter.Value || SpareFilters.Value <= 0)
-                return;
+            if (IsDead || IsSwappingFilter.Value)
+                return false;
 
-            SpareFilters.Value--;
             FilterTime.Value = 0f;
             IsSwappingFilter.Value = true;
             swapEndTime = Time.time + filterSwapTime;
+            return true;
         }
 
         [Rpc(SendTo.ClientsAndHost)]

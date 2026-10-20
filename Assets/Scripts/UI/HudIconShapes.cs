@@ -13,6 +13,7 @@ namespace Nuclear.UI
         Cell,
         Radiation,
         Microphone,
+        Can,
     }
 
     /// <summary>
@@ -61,6 +62,7 @@ namespace Nuclear.UI
             HudIcon.Cell => Cell(x, y),
             HudIcon.Radiation => Radiation(x, y),
             HudIcon.Microphone => Microphone(x, y),
+            HudIcon.Can => Can(x, y),
             _ => 1f,
         };
 
@@ -166,6 +168,17 @@ namespace Nuclear.UI
             float stem = RoundBox(x, y + 0.5f, 0.07f, 0.14f, 0.02f);
             float foot = RoundBox(x, y + 0.66f, 0.3f, 0.06f, 0.04f);
             return MathF.Min(MathF.Min(head, arc), MathF.Min(stem, foot));
+        }
+
+        private static float Can(float x, float y)
+        {
+            float body = RoundBox(x, y, 0.5f, 0.66f, 0.12f);
+            // Ободки сверху и снизу и этикетка — прорези.
+            float shape = body;
+            foreach (float rim in new[] { 0.48f, -0.48f })
+                shape = MathF.Max(shape, -RoundBox(x, y - rim, 0.42f, 0.03f, 0.02f));
+            float label = RoundBox(x, y, 0.3f, 0.2f, 0.06f);
+            return MathF.Max(shape, -(MathF.Abs(label) - 0.03f));
         }
 
         // ---------- Примитивы ----------

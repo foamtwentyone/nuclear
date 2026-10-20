@@ -109,7 +109,7 @@ namespace Nuclear.Level
 
             bool crowbar = false;
             foreach (var pryer in pryers)
-                crowbar |= pryer.HasCrowbar.Value;
+                crowbar |= pryer.HasCrowbar;
 
             if (PryerCount.Value != pryers.Count)
                 PryerCount.Value = pryers.Count;

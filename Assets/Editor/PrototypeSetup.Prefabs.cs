@@ -51,6 +51,8 @@ namespace Nuclear.EditorTools
                 ["flashlightPrefab"] = gear.Flashlight,
                 ["crowbarPrefab"] = gear.Crowbar,
                 ["batteryPrefab"] = gear.Battery,
+                ["filterPrefab"] = gear.Filter,
+                ["canPrefab"] = gear.Can,
             });
             root.AddComponent<PlayerPry>();
             root.AddComponent<PlayerHud>();
@@ -223,6 +225,7 @@ namespace Nuclear.EditorTools
                 ["impactSound"] = PhysicsItem.ImpactSound.Tin,
                 ["impactNoiseRadius"] = 12f,
             });
+            Configure(root.AddComponent<GearPickup>(), new Dictionary<string, object> { ["kind"] = GearKind.Can });
 
             return SavePrefab(root, "Can");
         }
@@ -300,7 +303,7 @@ namespace Nuclear.EditorTools
                 ["impactSound"] = PhysicsItem.ImpactSound.Tin,
                 ["impactNoiseRadius"] = 8f,
             });
-            root.AddComponent<FilterPickup>();
+            Configure(root.AddComponent<GearPickup>(), new Dictionary<string, object> { ["kind"] = GearKind.Filter });
 
             return SavePrefab(root, "Filter");
         }

@@ -64,7 +64,6 @@ namespace Nuclear.Player
                 return;
 
             survival.IsSwappingFilter.OnValueChanged += OnSwappingChanged;
-            survival.SpareFilters.OnValueChanged += OnSpareFiltersChanged;
             subscribed = true;
         }
 
@@ -74,7 +73,6 @@ namespace Nuclear.Player
                 return;
 
             survival.IsSwappingFilter.OnValueChanged -= OnSwappingChanged;
-            survival.SpareFilters.OnValueChanged -= OnSpareFiltersChanged;
         }
 
         private void Update()
@@ -174,12 +172,6 @@ namespace Nuclear.Player
                 return;
 
             body.PlayOneShot(current ? ProceduralAudio.FilterRemove : ProceduralAudio.FilterAttach, 0.8f);
-        }
-
-        private void OnSpareFiltersChanged(int previous, int current)
-        {
-            if (controller.IsOwner && current > previous)
-                personal.PlayOneShot(ProceduralAudio.Pickup, 0.7f);
         }
     }
 }

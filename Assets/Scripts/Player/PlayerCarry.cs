@@ -111,7 +111,7 @@ namespace Nuclear.Player
                 if (held != null)
                     ReleaseRpc(false);
                 else if (LookTarget != null && !LookTarget.IsFull)
-                    GrabRpc(LookTarget.NetworkObjectId);
+                    GrabRpc(LookTarget.NetworkObjectId, TryGetComponent(out PlayerGear gear) ? gear.Selected : -1);
             }
             else if (mouse.leftButton.wasPressedThisFrame && held != null && held.CanThrow)
             {
@@ -129,7 +129,7 @@ namespace Nuclear.Player
         }
 
         [Rpc(SendTo.Server, RequireOwnership = true)]
-        private void GrabRpc(ulong itemId)
+        private void GrabRpc(ulong itemId, int preferredSlot)
         {
             if (HeldItem != null || (survival != null && survival.IsDead))
                 return;
@@ -143,15 +143,9 @@ namespace Nuclear.Player
             if (distance > grabDistance + 1f)
                 return;
 
-            // Фильтр уходит в карман; если карман полон, его можно нести как обычный предмет.
-            if (item.TryGetComponent(out FilterPickup _) && survival != null && survival.TryStashFilter())
-            {
-                itemObject.Despawn();
-                return;
-            }
-
-            // Снаряжение тоже уходит в карман, если там есть место.
-            if (item.TryGetComponent(out GearPickup gearPickup) && TryGetComponent(out PlayerGear gear) && gear.TryStash(gearPickup))
+            // Мелкий предмет уходит в инвентарь (в выбранную ячейку, если она свободна);
+            // если ячеек нет, его можно нести как обычный предмет.
+            if (item.TryGetComponent(out GearPickup gearPickup) && TryGetComponent(out PlayerGear gear) && gear.TryStash(gearPickup, preferredSlot))
             {
                 itemObject.Despawn();
                 return;

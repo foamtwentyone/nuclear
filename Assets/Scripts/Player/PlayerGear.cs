@@ -1,3 +1,4 @@
+using System;
 using Nuclear.Audio;
 using Nuclear.Enemies;
 using Nuclear.Items;
@@ -5,23 +6,35 @@ using Nuclear.Noise;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Random = UnityEngine.Random;
 
 namespace Nuclear.Player
 {
+    /// <summary>Содержимое одной ячейки инвентаря.</summary>
+    public struct InventorySlot : INetworkSerializeByMemcpy, IEquatable<InventorySlot>
+    {
+        public bool Filled;
+        public GearKind Kind;
+        /// <summary>Заряд фонаря в секундах (для остальных предметов не используется).</summary>
+        public float Charge;
+
+        public static InventorySlot Of(GearKind kind, float charge = 0f) => new() { Filled = true, Kind = kind, Charge = charge };
+
+        public bool Is(GearKind kind) => Filled && Kind == kind;
+
+        public bool Equals(InventorySlot other) => Filled == other.Filled && Kind == other.Kind && Charge.Equals(other.Charge);
+    }
+
     /// <summary>
-    /// Карман снаряжения: бинт, фонарь с батарейками и лом, по одному каждого вида.
-    /// 1/2/3 выбирают предмет, ПКМ применяет выбранный, F включает фонарь.
-    /// Всё решает сервер; при смерти снаряжение выпадает рядом с телом.
+    /// Инвентарь на 4 ячейки: любой мелкий предмет (бинт, фонарь, лом, батарейка, фильтр, консерва)
+    /// кладётся в любую свободную. 1–4 или колесо мыши выбирают ячейку, ПКМ применяет выбранный предмет,
+    /// Q выбрасывает его вперёд, F включает фонарь, R меняет фильтр противогаза из инвентаря.
+    /// Всё решает сервер; при смерти содержимое выпадает рядом с телом.
     /// </summary>
     [RequireComponent(typeof(PlayerSurvival), typeof(PlayerController))]
     public class PlayerGear : NetworkBehaviour
     {
-        public enum Slot : byte
-        {
-            Bandage,
-            Flashlight,
-            Crowbar,
-        }
+        public const int SlotCount = 4;
 
         [Header("Бинт")]
         [SerializeField] private float bandageHeal = 40f;
@@ -32,43 +45,58 @@ namespace Nuclear.Player
 
         [Header("Фонарь")]
         [SerializeField] private float flashlightDuration = 180f;
-        [SerializeField] private int maxSpareBatteries = 2;
         [SerializeField] private float clickNoiseRadius = 3f;
 
         [Header("Лом")]
         [SerializeField] private float crowbarReach = 2.2f;
         [SerializeField] private float stunTime = 3f;
 
-        [Header("Префабы, которые выпадают при смерти")]
+        [Header("Выбрасывание")]
+        [SerializeField] private float dropSpeed = 3.5f;
+        [Tooltip("Консерву бросают далеко — чтобы отвлечь Слепыша стуком.")]
+        [SerializeField] private float canThrowSpeed = 10f;
+
+        [Header("Префабы предметов (выбрасывание и смерть)")]
         [SerializeField] private GameObject bandagePrefab;
         [SerializeField] private GameObject flashlightPrefab;
         [SerializeField] private GameObject crowbarPrefab;
         [SerializeField] private GameObject batteryPrefab;
+        [SerializeField] private GameObject filterPrefab;
+        [SerializeField] private GameObject canPrefab;
 
-        public readonly NetworkVariable<int> Bandages = new();
-        public readonly NetworkVariable<bool> HasFlashlight = new();
-        public readonly NetworkVariable<bool> HasCrowbar = new();
-        public readonly NetworkVariable<int> SpareBatteries = new();
-        public readonly NetworkVariable<float> FlashlightCharge = new();
-        public readonly NetworkVariable<bool> FlashlightOn = new();
+        // Ячейки — отдельные поля: Netcode находит NetworkVariable только среди полей, не в массивах.
+        private readonly NetworkVariable<InventorySlot> slot0 = new();
+        private readonly NetworkVariable<InventorySlot> slot1 = new();
+        private readonly NetworkVariable<InventorySlot> slot2 = new();
+        private readonly NetworkVariable<InventorySlot> slot3 = new();
+
+        /// <summary>Какая ячейка светит (−1 — фонарь выключен).</summary>
+        public readonly NetworkVariable<int> LightSlot = new(-1);
         /// <summary>Перевязка: 0 — не идёт, иначе доля 0..1.</summary>
         public readonly NetworkVariable<float> BandageProgress = new();
 
-        /// <summary>Выбранный предмет — только у владельца.</summary>
-        public Slot Selected { get; private set; }
+        /// <summary>Выбранная ячейка — только у владельца.</summary>
+        public int Selected { get; private set; }
 
         /// <summary>Свой игрок смотрит на товарища, которого можно перевязать (для подсказки).</summary>
         public bool LookingAtTeammate { get; private set; }
 
         public float FlashlightDuration => flashlightDuration;
+        public bool FlashlightOn => LightSlot.Value >= 0;
+        public bool HasCrowbar => IndexOf(GearKind.Crowbar) >= 0;
+        public bool HasSpace => IndexOf(null) >= 0;
+
+        public InventorySlot this[int index] => Slot(index).Value;
 
         private PlayerSurvival survival;
         private PlayerController controller;
         private Light flashlight;
         private Transform cameraTransform;
         private AudioSource hands;
+        private AudioSource personal;
 
         private PlayerSurvival bandageTarget;
+        private int bandageSlot;
         private float bandageStart;
         private Vector3 bandagePosition;
 
@@ -81,54 +109,75 @@ namespace Nuclear.Player
             if (lightTransform != null)
                 flashlight = lightTransform.GetComponent<Light>();
             hands = SoundSources.Create3D(gameObject, maxDistance: 15f);
+            personal = SoundSources.Create2D(gameObject);
         }
 
         public override void OnNetworkSpawn()
         {
-            FlashlightOn.OnValueChanged += OnFlashlightChanged;
+            LightSlot.OnValueChanged += OnLightChanged;
             survival.Health.OnValueChanged += OnHealthChanged;
-            OnFlashlightChanged(false, FlashlightOn.Value);
+            for (int i = 0; i < SlotCount; i++)
+                Slot(i).OnValueChanged += OnSlotChanged;
+            OnLightChanged(-1, LightSlot.Value);
         }
 
         public override void OnNetworkDespawn()
         {
-            FlashlightOn.OnValueChanged -= OnFlashlightChanged;
+            LightSlot.OnValueChanged -= OnLightChanged;
             survival.Health.OnValueChanged -= OnHealthChanged;
+            for (int i = 0; i < SlotCount; i++)
+                Slot(i).OnValueChanged -= OnSlotChanged;
         }
 
-        /// <summary>Есть ли в кармане место под такой предмет (видно всем, для подсказок).</summary>
-        public bool HasSpaceFor(GearKind kind) => kind switch
+        private NetworkVariable<InventorySlot> Slot(int index) => index switch
         {
-            GearKind.Bandage => Bandages.Value < 1,
-            GearKind.Flashlight => !HasFlashlight.Value,
-            GearKind.Crowbar => !HasCrowbar.Value,
-            GearKind.FlashlightBattery => SpareBatteries.Value < maxSpareBatteries,
-            _ => false,
+            0 => slot0,
+            1 => slot1,
+            2 => slot2,
+            _ => slot3,
         };
 
-        /// <summary>Сервер: кладёт снаряжение в карман, если есть место.</summary>
-        public bool TryStash(GearPickup pickup)
+        /// <summary>Первая ячейка с таким предметом (null — первая пустая) или −1.</summary>
+        public int IndexOf(GearKind? kind)
         {
-            if (survival.IsDead || !HasSpaceFor(pickup.Kind))
+            for (int i = 0; i < SlotCount; i++)
+            {
+                var slot = Slot(i).Value;
+                if (kind == null ? !slot.Filled : slot.Is(kind.Value))
+                    return i;
+            }
+            return -1;
+        }
+
+        public int Count(GearKind kind)
+        {
+            int count = 0;
+            for (int i = 0; i < SlotCount; i++)
+                count += Slot(i).Value.Is(kind) ? 1 : 0;
+            return count;
+        }
+
+        /// <summary>Сервер: кладёт предмет в предпочтительную ячейку, если она свободна, иначе в первую свободную.</summary>
+        public bool TryStash(GearPickup pickup, int preferred)
+        {
+            if (survival.IsDead)
+                return false;
+            int index = preferred >= 0 && preferred < SlotCount && !Slot(preferred).Value.Filled ? preferred : IndexOf(null);
+            if (index < 0)
                 return false;
 
-            switch (pickup.Kind)
-            {
-                case GearKind.Bandage:
-                    Bandages.Value++;
-                    break;
-                case GearKind.Flashlight:
-                    HasFlashlight.Value = true;
-                    FlashlightCharge.Value = pickup.Charge < 0f ? flashlightDuration : pickup.Charge;
-                    break;
-                case GearKind.Crowbar:
-                    HasCrowbar.Value = true;
-                    break;
-                case GearKind.FlashlightBattery:
-                    SpareBatteries.Value++;
-                    break;
-            }
+            float charge = pickup.Kind == GearKind.Flashlight ? (pickup.Charge < 0f ? flashlightDuration : pickup.Charge) : 0f;
+            Slot(index).Value = InventorySlot.Of(pickup.Kind, charge);
             return true;
+        }
+
+        private void Clear(int index)
+        {
+            Slot(index).Value = default;
+            if (LightSlot.Value == index)
+                LightSlot.Value = -1;
+            if (bandageTarget != null && bandageSlot == index)
+                CancelBandage();
         }
 
         private void Update()
@@ -144,10 +193,12 @@ namespace Nuclear.Player
 
             if (IsOwner)
                 ReadInput();
-            else if (FlashlightOn.Value)
+            else if (FlashlightOn)
                 // У чужих камера выключена; поворачиваем её по взгляду, чтобы луч светил туда, куда игрок смотрит.
                 cameraTransform.localRotation = Quaternion.Euler(controller.LookPitch.Value, 0f, 0f);
         }
+
+        // ---------- Ввод ----------
 
         private void ReadInput()
         {
@@ -162,31 +213,76 @@ namespace Nuclear.Player
                 return;
 
             if (keyboard.digit1Key.wasPressedThisFrame)
-                Selected = Slot.Bandage;
+                Selected = 0;
             else if (keyboard.digit2Key.wasPressedThisFrame)
-                Selected = Slot.Flashlight;
+                Selected = 1;
             else if (keyboard.digit3Key.wasPressedThisFrame)
-                Selected = Slot.Crowbar;
+                Selected = 2;
+            else if (keyboard.digit4Key.wasPressedThisFrame)
+                Selected = 3;
 
-            if (keyboard.fKey.wasPressedThisFrame && HasFlashlight.Value)
-                ToggleFlashlightRpc();
+            float scroll = mouse.scroll.ReadValue().y;
+            if (Mathf.Abs(scroll) > 0.01f)
+                Selected = (Selected + (scroll < 0f ? 1 : SlotCount - 1)) % SlotCount;
 
-            if (!mouse.rightButton.wasPressedThisFrame)
-                return;
-
-            switch (Selected)
+            if (keyboard.fKey.wasPressedThisFrame)
             {
-                case Slot.Bandage when Bandages.Value > 0 && BandageProgress.Value <= 0f:
+                int light = FlashlightOn ? LightSlot.Value : this[Selected].Is(GearKind.Flashlight) ? Selected : IndexOf(GearKind.Flashlight);
+                if (light >= 0)
+                    ToggleFlashlightRpc(light);
+            }
+
+            if (keyboard.rKey.wasPressedThisFrame && IndexOf(GearKind.Filter) >= 0 && !survival.IsSwappingFilter.Value)
+                SwapFilterRpc(this[Selected].Is(GearKind.Filter) ? Selected : IndexOf(GearKind.Filter));
+
+            if (keyboard.qKey.wasPressedThisFrame && this[Selected].Filled)
+                DropRpc(Selected);
+
+            if (mouse.rightButton.wasPressedThisFrame)
+                UseSelected();
+        }
+
+        private void UseSelected()
+        {
+            var slot = this[Selected];
+            if (!slot.Filled)
+                return;
+            switch (slot.Kind)
+            {
+                case GearKind.Bandage when BandageProgress.Value <= 0f:
                     var teammate = FindTeammateInView();
-                    BandageRpc(teammate != null ? teammate.NetworkObject : NetworkObject);
+                    BandageRpc(Selected, teammate != null ? teammate.NetworkObject : NetworkObject);
                     break;
-                case Slot.Flashlight when HasFlashlight.Value:
-                    ToggleFlashlightRpc();
+                case GearKind.Flashlight:
+                    ToggleFlashlightRpc(Selected);
                     break;
-                case Slot.Crowbar when HasCrowbar.Value:
-                    SwingRpc();
+                case GearKind.Crowbar:
+                    SwingRpc(Selected);
+                    break;
+                case GearKind.Filter when !survival.IsSwappingFilter.Value:
+                    SwapFilterRpc(Selected);
+                    break;
+                case GearKind.FlashlightBattery when IndexOf(GearKind.Flashlight) >= 0:
+                    InsertBatteryRpc(Selected);
                     break;
             }
+        }
+
+        /// <summary>Что сделает ПКМ с выбранным предметом — для подсказки (null — ничего).</summary>
+        public string UseHint()
+        {
+            var slot = this[Selected];
+            if (!slot.Filled)
+                return null;
+            return slot.Kind switch
+            {
+                GearKind.Bandage => LookingAtTeammate ? "перевязать товарища" : "перевязать себя",
+                GearKind.Flashlight => FlashlightOn && LightSlot.Value == Selected ? "выключить фонарь" : "включить фонарь",
+                GearKind.Crowbar => "ударить Слепыша (оглушит, лом сломается)",
+                GearKind.Filter => "сменить фильтр противогаза",
+                GearKind.FlashlightBattery => IndexOf(GearKind.Flashlight) >= 0 ? "вставить в фонарь" : null,
+                _ => null,
+            };
         }
 
         private PlayerSurvival FindTeammateInView()
@@ -198,12 +294,30 @@ namespace Nuclear.Player
             return other != null && other != survival && !other.IsDead ? other : null;
         }
 
+        private bool Holds(int index, GearKind kind) => index >= 0 && index < SlotCount && Slot(index).Value.Is(kind);
+
+        // ---------- Выбрасывание ----------
+
+        [Rpc(SendTo.Server, RequireOwnership = true)]
+        private void DropRpc(int index)
+        {
+            if (survival.IsDead || index < 0 || index >= SlotCount || !Slot(index).Value.Filled)
+                return;
+
+            var slot = Slot(index).Value;
+            Clear(index);
+            Vector3 origin = controller.LookOrigin + controller.LookDirection * 0.5f;
+            var instance = Spawn(slot, origin);
+            if (instance != null && instance.TryGetComponent(out Rigidbody body))
+                body.AddForce(controller.LookDirection * (slot.Kind == GearKind.Can ? canThrowSpeed : dropSpeed) + Vector3.up * 1.5f, ForceMode.VelocityChange);
+        }
+
         // ---------- Бинт ----------
 
         [Rpc(SendTo.Server, RequireOwnership = true)]
-        private void BandageRpc(NetworkObjectReference target)
+        private void BandageRpc(int index, NetworkObjectReference target)
         {
-            if (survival.IsDead || Bandages.Value <= 0 || bandageTarget != null)
+            if (survival.IsDead || !Holds(index, GearKind.Bandage) || bandageTarget != null)
                 return;
             if (!target.TryGet(out var targetObject) || !targetObject.TryGetComponent(out PlayerSurvival patient) || patient.IsDead)
                 return;
@@ -211,6 +325,7 @@ namespace Nuclear.Player
                 return;
 
             bandageTarget = patient;
+            bandageSlot = index;
             bandageStart = Time.time;
             bandagePosition = transform.position;
             BandageProgress.Value = 0.001f;
@@ -222,13 +337,12 @@ namespace Nuclear.Player
             if (bandageTarget == null)
                 return;
 
-            bool interrupted = survival.IsDead || bandageTarget.IsDead
+            bool interrupted = survival.IsDead || bandageTarget.IsDead || !Holds(bandageSlot, GearKind.Bandage)
                 || Vector3.Distance(transform.position, bandagePosition) > bandageMoveTolerance
                 || Vector3.Distance(transform.position, bandageTarget.transform.position) > bandageReach + 1f;
             if (interrupted)
             {
-                bandageTarget = null;
-                BandageProgress.Value = 0f;
+                CancelBandage();
                 return;
             }
 
@@ -239,68 +353,119 @@ namespace Nuclear.Player
                 return;
             }
 
-            bandageTarget.Heal(bandageHeal);
-            Bandages.Value--;
+            var patient = bandageTarget;
             bandageTarget = null;
             BandageProgress.Value = 0f;
+            Slot(bandageSlot).Value = default;
+            patient.Heal(bandageHeal);
             HandsSoundRpc(1);
+        }
+
+        private void CancelBandage()
+        {
+            bandageTarget = null;
+            BandageProgress.Value = 0f;
+        }
+
+        // ---------- Фильтр ----------
+
+        [Rpc(SendTo.Server, RequireOwnership = true)]
+        private void SwapFilterRpc(int index)
+        {
+            if (!Holds(index, GearKind.Filter) || !survival.BeginFilterSwap())
+                return;
+            Slot(index).Value = default;
         }
 
         // ---------- Фонарь ----------
 
         [Rpc(SendTo.Server, RequireOwnership = true)]
-        private void ToggleFlashlightRpc()
+        private void ToggleFlashlightRpc(int index)
         {
-            if (survival.IsDead || !HasFlashlight.Value)
+            if (survival.IsDead || !Holds(index, GearKind.Flashlight))
                 return;
-            if (!FlashlightOn.Value && FlashlightCharge.Value <= 0f && !TryReload())
-            {
-                HandsSoundRpc(2);
-                return;
-            }
 
-            FlashlightOn.Value = !FlashlightOn.Value;
+            if (LightSlot.Value == index)
+                LightSlot.Value = -1;
+            else if (Slot(index).Value.Charge > 0f || TryReload(index))
+                LightSlot.Value = index;
             NoiseEvents.Emit(controller.LookOrigin, clickNoiseRadius);
+            HandsSoundRpc(2);
+        }
+
+        [Rpc(SendTo.Server, RequireOwnership = true)]
+        private void InsertBatteryRpc(int index)
+        {
+            if (survival.IsDead || !Holds(index, GearKind.FlashlightBattery))
+                return;
+
+            // Батарейка — в самый разряженный фонарь.
+            int target = -1;
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (Slot(i).Value.Is(GearKind.Flashlight) && (target < 0 || Slot(i).Value.Charge < Slot(target).Value.Charge))
+                    target = i;
+            }
+            if (target < 0)
+                return;
+            Slot(index).Value = default;
+            SetCharge(target, flashlightDuration);
             HandsSoundRpc(2);
         }
 
         private void TickFlashlight(float deltaTime)
         {
-            if (!FlashlightOn.Value)
+            int index = LightSlot.Value;
+            if (index < 0)
+                return;
+            if (!Holds(index, GearKind.Flashlight))
+            {
+                LightSlot.Value = -1;
+                return;
+            }
+
+            // Netcode рассылает изменения раз в сетевой тик, так что запись каждый кадр не нагружает сеть.
+            float charge = Mathf.Max(0f, Slot(index).Value.Charge - deltaTime);
+            SetCharge(index, charge);
+            if (charge > 0f)
                 return;
 
-            FlashlightCharge.Value = Mathf.Max(0f, FlashlightCharge.Value - deltaTime);
-            if (FlashlightCharge.Value > 0f)
-                return;
-
-            // Села батарейка — сразу ставим запасную, если есть.
-            if (TryReload())
+            // Села батарейка — сразу ставим запасную из инвентаря, если есть.
+            if (TryReload(index))
                 HandsSoundRpc(2);
             else
-                FlashlightOn.Value = false;
+                LightSlot.Value = -1;
         }
 
-        private bool TryReload()
+        private void SetCharge(int index, float charge)
         {
-            if (SpareBatteries.Value <= 0)
+            var slot = Slot(index).Value;
+            slot.Charge = charge;
+            Slot(index).Value = slot;
+        }
+
+        private bool TryReload(int flashlightIndex)
+        {
+            int cell = IndexOf(GearKind.FlashlightBattery);
+            if (cell < 0)
                 return false;
-            SpareBatteries.Value--;
-            FlashlightCharge.Value = flashlightDuration;
+            Slot(cell).Value = default;
+            SetCharge(flashlightIndex, flashlightDuration);
             return true;
         }
 
-        private void OnFlashlightChanged(bool previous, bool current)
+        private void OnLightChanged(int previous, int current)
         {
             if (flashlight != null)
-                flashlight.enabled = current;
+                flashlight.enabled = current >= 0;
         }
 
         // ---------- Лом ----------
 
         [Rpc(SendTo.Server, RequireOwnership = true)]
-        private void SwingRpc()
+        private void SwingRpc(int index)
         {
-            if (survival.IsDead || !HasCrowbar.Value)
+            if (survival.IsDead || !Holds(index, GearKind.Crowbar))
                 return;
 
             Vector3 origin = controller.LookOrigin;
@@ -319,7 +484,7 @@ namespace Nuclear.Player
                     continue;
 
                 blindOne.Stun(stunTime);
-                HasCrowbar.Value = false;
+                Clear(index);
                 CrowbarHitRpc(point);
                 return;
             }
@@ -363,42 +528,51 @@ namespace Nuclear.Player
             }
         }
 
+        private void OnSlotChanged(InventorySlot previous, InventorySlot current)
+        {
+            // Свой игрок слышит, как предмет лёг в инвентарь.
+            if (IsOwner && current.Filled && (!previous.Filled || previous.Kind != current.Kind))
+                personal.PlayOneShot(ProceduralAudio.Pickup, 0.7f);
+        }
+
         private void OnHealthChanged(float previous, float current)
         {
             if (!IsServer || current > 0f || previous <= 0f)
                 return;
 
-            bandageTarget = null;
-            BandageProgress.Value = 0f;
-            FlashlightOn.Value = false;
+            CancelBandage();
+            LightSlot.Value = -1;
 
-            // Снаряжение погибшего выпадает рядом с телом — его могут подобрать живые.
-            for (int i = 0; i < Bandages.Value; i++)
-                Drop(bandagePrefab);
-            if (HasFlashlight.Value)
+            // Всё из инвентаря выпадает рядом с телом — его могут подобрать живые.
+            for (int i = 0; i < SlotCount; i++)
             {
-                var dropped = Drop(flashlightPrefab);
-                if (dropped != null && dropped.TryGetComponent(out GearPickup pickup))
-                    pickup.Charge = FlashlightCharge.Value;
+                var slot = Slot(i).Value;
+                if (!slot.Filled)
+                    continue;
+                Vector2 offset = Random.insideUnitCircle * 0.6f;
+                Spawn(slot, transform.position + new Vector3(offset.x, 0.4f, offset.y));
+                Slot(i).Value = default;
             }
-            if (HasCrowbar.Value)
-                Drop(crowbarPrefab);
-            for (int i = 0; i < SpareBatteries.Value; i++)
-                Drop(batteryPrefab);
-
-            Bandages.Value = 0;
-            HasFlashlight.Value = false;
-            HasCrowbar.Value = false;
-            SpareBatteries.Value = 0;
-            FlashlightCharge.Value = 0f;
         }
 
-        private GameObject Drop(GameObject prefab)
+        private GameObject Spawn(InventorySlot slot, Vector3 position)
         {
+            var prefab = slot.Kind switch
+            {
+                GearKind.Bandage => bandagePrefab,
+                GearKind.Flashlight => flashlightPrefab,
+                GearKind.Crowbar => crowbarPrefab,
+                GearKind.FlashlightBattery => batteryPrefab,
+                GearKind.Filter => filterPrefab,
+                GearKind.Can => canPrefab,
+                _ => null,
+            };
             if (prefab == null)
                 return null;
-            Vector2 offset = Random.insideUnitCircle * 0.6f;
-            var instance = Instantiate(prefab, transform.position + new Vector3(offset.x, 0.4f, offset.y), Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
+
+            var instance = Instantiate(prefab, position, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
+            if (slot.Kind == GearKind.Flashlight && instance.TryGetComponent(out GearPickup pickup))
+                pickup.Charge = slot.Charge;
             instance.GetComponent<NetworkObject>().Spawn(true);
             return instance;
         }

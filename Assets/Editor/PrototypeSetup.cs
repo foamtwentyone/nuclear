@@ -68,6 +68,8 @@ namespace Nuclear.EditorTools
                 Flashlight = BuildGearPrefab("Flashlight", "Фонарь", GearKind.Flashlight, Models.Flashlight, new Vector3(0.07f, 0.07f, 0.2f), 0.4f),
                 Crowbar = BuildGearPrefab("Crowbar", "Лом", GearKind.Crowbar, Models.Crowbar, new Vector3(0.8f, 0.1f, 0.04f), 1.5f),
                 Battery = BuildGearPrefab("Flashlight Battery", "Батарейка", GearKind.FlashlightBattery, Models.FlashlightBattery, new Vector3(0.065f, 0.034f, 0.034f), 0.05f),
+                Filter = BuildFilterPrefab(),
+                Can = BuildCanPrefab(),
             };
             var playerPrefab = BuildPlayerPrefab(gear);
             var items = new ItemPrefabs
@@ -75,8 +77,8 @@ namespace Nuclear.EditorTools
                 Gear = gear,
                 Battery = BuildBatteryPrefab(),
                 Crate = BuildCratePrefab(),
-                Can = BuildCanPrefab(),
-                Filter = BuildFilterPrefab(),
+                Can = gear.Can,
+                Filter = gear.Filter,
                 BlindOne = BuildBlindOnePrefab(),
                 Door = BuildDoorPrefab(),
             };
@@ -107,6 +109,8 @@ namespace Nuclear.EditorTools
             public GameObject Flashlight;
             public GameObject Crowbar;
             public GameObject Battery;
+            public GameObject Filter;
+            public GameObject Can;
         }
 
         // ---------- Материалы ----------

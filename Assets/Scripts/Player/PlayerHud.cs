@@ -302,7 +302,7 @@ namespace Nuclear.Player
                 shout ? "КРИК · 20 М" : "ГОЛОС · 8 М", 14f, HudDraw.Ink, TextAnchor.MiddleCenter, HudDraw.Face.Heading, outline: false);
         }
 
-        // ---------- Ящики снаряжения ----------
+        // ---------- Инвентарь ----------
 
         private void DrawHotbar()
         {
@@ -310,39 +310,45 @@ namespace Nuclear.Player
                 return;
 
             float s = HudDraw.Scale;
-            const float big = 86f, small = 66f, gap = 14f, separator = 30f;
-            float width = (big * 3f + gap * 2f + separator + small * 2f + gap) * s;
+            const float size = 86f, gap = 14f;
+            float width = (size * PlayerGear.SlotCount + gap * (PlayerGear.SlotCount - 1)) * s;
             float x = (Screen.width - width) / 2f;
             float bottom = Screen.height - 34f * s;
-            bool lightOn = gear.FlashlightOn.Value;
 
-            Slot(ref x, bottom, big, "1", HudIcon.Bandage, gear.Bandages.Value > 0, gear.Selected == PlayerGear.Slot.Bandage, 0, -1f, false);
-            Slot(ref x, bottom, big, "2", HudIcon.Flashlight, gear.HasFlashlight.Value, gear.Selected == PlayerGear.Slot.Flashlight, 0,
-                gear.HasFlashlight.Value ? gear.FlashlightCharge.Value / gear.FlashlightDuration : -1f, lightOn);
-            Slot(ref x, bottom, big, "3", HudIcon.Crowbar, gear.HasCrowbar.Value, gear.Selected == PlayerGear.Slot.Crowbar, 0, -1f, false);
-
-            x += (separator - gap) * s;
-            int filters = survival.SpareFilters.Value;
-            Slot(ref x, bottom, small, "R", HudIcon.Filter, filters > 0, false, filters, -1f, false);
-            int cells = gear.SpareBatteries.Value;
-            Slot(ref x, bottom, small, null, HudIcon.Cell, cells > 0, false, cells, -1f, false);
-
-            string action = gear.Selected switch
+            for (int i = 0; i < PlayerGear.SlotCount; i++)
             {
-                PlayerGear.Slot.Bandage when gear.Bandages.Value > 0 => gear.LookingAtTeammate ? "перевязать товарища" : "перевязать себя",
-                PlayerGear.Slot.Flashlight when gear.HasFlashlight.Value => lightOn ? "выключить фонарь" : "включить фонарь",
-                PlayerGear.Slot.Crowbar when gear.HasCrowbar.Value => "ударить Слепыша (оглушит, лом сломается)",
-                _ => null,
-            };
-            if (action != null)
-                HudDraw.Tape(new Vector2(Screen.width / 2f, bottom - (big + 46f) * s), HudDraw.Ink, 16f, ("ПКМ", action));
+                var slot = gear[i];
+                bool filled = slot.Filled;
+                bool flashlight = slot.Is(GearKind.Flashlight);
+                Slot(ref x, bottom, size, (i + 1).ToString(), filled ? IconOf(slot.Kind) : null, filled, gear.Selected == i, 0,
+                    flashlight ? slot.Charge / gear.FlashlightDuration : -1f, flashlight && gear.LightSlot.Value == i);
+            }
+
+            var selected = gear[gear.Selected];
+            if (!selected.Filled)
+                return;
+            string use = gear.UseHint();
+            var parts = use != null
+                ? new[] { ("", GearPickup.NameOf(selected.Kind) + ":"), ("ПКМ", use), ("Q", "выбросить") }
+                : new[] { ("", GearPickup.NameOf(selected.Kind) + ":"), ("Q", selected.Kind == GearKind.Can ? "бросить (отвлечь Слепыша)" : "выбросить") };
+            HudDraw.Tape(new Vector2(Screen.width / 2f, bottom - (size + 46f) * s), HudDraw.Ink, 16f, parts);
         }
 
+        private static HudIcon IconOf(GearKind kind) => kind switch
+        {
+            GearKind.Bandage => HudIcon.Bandage,
+            GearKind.Flashlight => HudIcon.Flashlight,
+            GearKind.Crowbar => HudIcon.Crowbar,
+            GearKind.FlashlightBattery => HudIcon.Cell,
+            GearKind.Filter => HudIcon.Filter,
+            _ => HudIcon.Can,
+        };
+
         /// <summary>
-        /// Ящик снаряжения: стальная пластина с заклёпками, жёлтая бирка с клавишей, иконка.
+        /// Ячейка инвентаря: стальной ящик с заклёпками, жёлтая бирка с клавишей, иконка предмета.
         /// Выбранный приподнят, обведён жёлтым и подчёркнут полосой «опасность».
         /// </summary>
-        private static void Slot(ref float x, float bottom, float size, string key, HudIcon icon, bool has, bool selected,
+        private static void Slot(ref float x, float bottom, float size, string key, HudIcon? icon, bool has, bool selected,
             int count, float charge, bool glowing)
         {
             float s = HudDraw.Scale;
@@ -361,7 +367,8 @@ namespace Nuclear.Player
             float iconSize = side * (footer ? 0.56f : 0.64f);
             var iconRect = new Rect(rect.center.x - iconSize / 2f, rect.center.y - iconSize / 2f - (footer ? 7f * s : 0f), iconSize, iconSize);
             var tint = !has ? new Color(1f, 1f, 1f, 0.13f) : glowing ? new Color(1f, 0.94f, 0.62f) : HudDraw.Cream;
-            HudDraw.Icon(iconRect, icon, tint);
+            if (icon.HasValue)
+                HudDraw.Icon(iconRect, icon.Value, tint);
 
             if (key != null)
                 HudDraw.Tag(new Rect(rect.x - 7f * s, rect.y - 9f * s, 28f * s, 26f * s), key, 15f, selected ? Selected : HudDraw.HazardYellow);
@@ -425,15 +432,14 @@ namespace Nuclear.Player
             {
                 if (target.IsFull)
                     parts = new[] { ("", $"{target.DisplayName}{ChargeText(target)}: уже несут") };
-                else if ((target.TryGetComponent(out FilterPickup _) && survival.HasPocketSpace)
-                         || (target.TryGetComponent(out GearPickup gearPickup) && gear != null && gear.HasSpaceFor(gearPickup.Kind)))
-                    parts = new[] { ("E", $"в карман: {target.DisplayName}") };
+                else if (target.TryGetComponent(out GearPickup _) && gear != null && gear.HasSpace)
+                    parts = new[] { ("E", $"в инвентарь: {target.DisplayName}") };
                 else
                     parts = new[] { ("E", $"взять: {target.DisplayName}{ChargeText(target)}") };
             }
             else if (pry != null && pry.LookHood is { } hood && hood.Progress.Value <= 0f)
             {
-                bool crowbar = gear != null && gear.HasCrowbar.Value;
+                bool crowbar = gear != null && gear.HasCrowbar;
                 if (hood.PryerCount.Value == 1 && !hood.WithCrowbar.Value)
                 {
                     parts = new[] { ("", "Одному без лома не открыть — нужен второй игрок") };
