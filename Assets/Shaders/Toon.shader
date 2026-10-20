@@ -1,5 +1,6 @@
 // Мультяшное освещение для URP в духе Peak и Pratfall: свет ложится несколькими ровными ступенями
-// с мягкими краями, тень окрашена в тёплый цвет вместо серого, по силуэту — светлый ободок.
+// с мягкими краями, тень слегка окрашена вместо серой, по освещённому силуэту — светлый ободок.
+// По яркости не светлее URP Lit: те же солнце + небо, только ступенями.
 // Тени, глубина и нормали для SSAO берутся готовыми проходами из URP Lit.
 Shader "Nuclear/Toon"
 {
@@ -13,10 +14,10 @@ Shader "Nuclear/Toon"
 
         _Steps ("Light steps", Range(1, 6)) = 3
         _StepSoftness ("Step softness", Range(0.01, 1)) = 0.12
-        _ShadowTint ("Shadow tint", Color) = (0.42, 0.36, 0.48, 1)
-        _AmbientStrength ("Ambient strength", Range(0, 2)) = 0.9
+        _ShadowTint ("Shadow tint", Color) = (0.82, 0.76, 0.95, 1)
+        _AmbientStrength ("Ambient strength", Range(0, 2)) = 1
         _RimColor ("Rim color", Color) = (1, 0.95, 0.85, 1)
-        _RimStrength ("Rim strength", Range(0, 1)) = 0.28
+        _RimStrength ("Rim strength", Range(0, 1)) = 0.35
         _RimWidth ("Rim width", Range(0, 1)) = 0.3
 
         // Нужны проходам, взятым из URP Lit.
@@ -115,21 +116,21 @@ Shader "Nuclear/Toon"
                 return saturate((band + edge) / steps);
             }
 
-            // Свет одного источника: ступень по полу-Ламберту, тень окрашена, а не серая.
-            half3 ToonLight(Light light, half3 normalWS, half3 viewWS, half3 albedo)
+            // Освещённость источником 0..1 ступенями. Немного «обёрнута» за терминатор, чтобы ступени
+            // ложились на форму мягче, но тёмная сторона остаётся тёмной.
+            half ToonDiffuse(Light light, half3 normalWS)
             {
-                half nDotL = dot(normalWS, light.direction);
-                half attenuation = light.shadowAttenuation * light.distanceAttenuation;
-                half lit = Ramp((nDotL * 0.5h + 0.5h) * attenuation);
-                half3 shade = lerp(_ShadowTint.rgb, 1.0h, lit);
+                half wrapped = saturate((dot(normalWS, light.direction) + 0.15h) / 1.15h);
+                return Ramp(wrapped * light.shadowAttenuation);
+            }
 
-                // Блик — одно чёткое пятно, только у гладких поверхностей (металл, стекло, краска).
+            // Блик — одно чёткое пятно, только у гладких поверхностей (металл, стекло, краска).
+            half ToonSpecular(Light light, half3 normalWS, half3 viewWS)
+            {
                 half3 halfDir = SafeNormalize(light.direction + viewWS);
                 half specularPower = exp2(10.0h * _Smoothness + 1.0h);
-                half specular = smoothstep(0.5h, 0.56h, pow(saturate(dot(normalWS, halfDir)), specularPower))
-                    * saturate((_Smoothness - 0.2h) * 3.0h) * lit;
-
-                return light.color * (albedo * shade + specular * 0.5h);
+                return smoothstep(0.5h, 0.56h, pow(saturate(dot(normalWS, halfDir)), specularPower))
+                    * saturate((_Smoothness - 0.2h) * 3.0h) * 0.35h;
             }
 
             half4 frag(Varyings input) : SV_Target
@@ -147,10 +148,16 @@ Shader "Nuclear/Toon"
                 float2 screenUV = GetNormalizedScreenSpaceUV(input.positionCS);
                 AmbientOcclusionFactor occlusion = GetScreenSpaceAmbientOcclusion(screenUV);
 
-                Light mainLight = GetMainLight(TransformWorldToShadowCoord(input.positionWS));
-                mainLight.color *= occlusion.directAmbientOcclusion;
-                half3 color = ToonLight(mainLight, normalWS, viewWS, albedo.rgb);
+                // Небо и отражённый свет — по нормали; в тени слегка окрашены (_ShadowTint), а не серые.
+                half3 ambient = SampleSH(normalWS) * _AmbientStrength * occlusion.indirectAmbientOcclusion;
 
+                Light mainLight = GetMainLight(TransformWorldToShadowCoord(input.positionWS));
+                half mainLit = ToonDiffuse(mainLight, normalWS) * occlusion.directAmbientOcclusion;
+                half3 shadowAmbient = ambient * lerp(_ShadowTint.rgb, 1.0h, mainLit);
+                half3 color = albedo.rgb * (shadowAmbient + mainLight.color * mainLit)
+                    + mainLight.color * ToonSpecular(mainLight, normalWS, viewWS) * mainLit;
+
+                // Огни и лампы только добавляют свет и гаснут с расстоянием — вне радиуса их не видно.
                 #if defined(_ADDITIONAL_LIGHTS)
                 InputData inputData = (InputData)0;
                 inputData.positionWS = input.positionWS;
@@ -160,19 +167,15 @@ Shader "Nuclear/Toon"
                 uint lightCount = GetAdditionalLightsCount();
                 LIGHT_LOOP_BEGIN(lightCount)
                     Light light = GetAdditionalLight(lightIndex, input.positionWS, half4(1, 1, 1, 1));
-                    color += ToonLight(light, normalWS, viewWS, albedo.rgb);
+                    half lit = ToonDiffuse(light, normalWS) * light.distanceAttenuation;
+                    color += light.color * lit * (albedo.rgb + ToonSpecular(light, normalWS, viewWS));
                 LIGHT_LOOP_END
                 #endif
 
-                // Небо и отражённый свет — плоско, по усреднённой нормали, чтобы не размывать ступени.
-                half3 ambient = SampleSH(normalWS) * _AmbientStrength * occlusion.indirectAmbientOcclusion;
-                color += albedo.rgb * ambient;
-
-                // Ободок по силуэту, сильнее на освещённой стороне.
+                // Ободок по силуэту, только на освещённой стороне и неяркий.
                 half fresnel = 1.0h - saturate(dot(normalWS, viewWS));
                 half rim = smoothstep(1.0h - _RimWidth, 1.0h - _RimWidth + 0.08h, fresnel);
-                half towardLight = saturate(dot(normalWS, mainLight.direction) * 0.5h + 0.6h);
-                color += _RimColor.rgb * mainLight.color * rim * towardLight * _RimStrength;
+                color += _RimColor.rgb * mainLight.color * albedo.rgb * rim * mainLit * _RimStrength;
 
                 color = MixFog(color, input.fogFactor);
                 return half4(color, 1.0h);

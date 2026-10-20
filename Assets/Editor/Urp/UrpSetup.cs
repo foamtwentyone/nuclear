@@ -94,9 +94,9 @@ namespace Nuclear.EditorTools.Urp
             tonemapping.mode.Override(TonemappingMode.Neutral);
 
             var color = AddOverride<ColorAdjustments>(profile);
-            color.postExposure.Override(0.25f);
+            color.postExposure.Override(0f);
             color.contrast.Override(8f);
-            color.saturation.Override(12f);
+            color.saturation.Override(0f);
 
             AddOverride<WhiteBalance>(profile).temperature.Override(6f);
 
@@ -105,8 +105,8 @@ namespace Nuclear.EditorTools.Urp
             tones.highlights.Override(new Vector4(1.04f, 1f, 0.95f, 0f));
 
             var bloom = AddOverride<Bloom>(profile);
-            bloom.intensity.Override(0.5f);
-            bloom.threshold.Override(1f);
+            bloom.intensity.Override(0.25f);
+            bloom.threshold.Override(1.2f);
             bloom.scatter.Override(0.65f);
 
             var vignette = AddOverride<Vignette>(profile);
