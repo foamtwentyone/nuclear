@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Nuclear.Hazards;
 using Nuclear.Items;
 using Nuclear.Network;
 using Nuclear.Player;
@@ -40,6 +41,7 @@ namespace Nuclear.EditorTools
                 Battery = BuildBatteryPrefab(),
                 Crate = BuildCratePrefab(),
                 Can = BuildCanPrefab(),
+                Filter = BuildFilterPrefab(),
             };
             BuildScene(playerPrefab, items);
 
@@ -68,6 +70,8 @@ namespace Nuclear.EditorTools
             root.AddComponent<PlayerStamina>();
             root.AddComponent<PlayerController>();
             root.AddComponent<PlayerCarry>();
+            root.AddComponent<PlayerSurvival>();
+            root.AddComponent<Dosimeter>();
             root.AddComponent<PlayerHud>();
 
             var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
@@ -95,6 +99,7 @@ namespace Nuclear.EditorTools
             public GameObject Battery;
             public GameObject Crate;
             public GameObject Can;
+            public GameObject Filter;
         }
 
         private static GameObject BuildBatteryPrefab()
@@ -146,6 +151,27 @@ namespace Nuclear.EditorTools
             });
 
             return SavePrefab(root, "Crate");
+        }
+
+        private static GameObject BuildFilterPrefab()
+        {
+            var root = CreateItemRoot("Filter", mass: 0.4f, continuous: true);
+            AddModel(root, PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.12f, 0.05f, 0.12f),
+                SaveMaterial("Filter", new Color(0.35f, 0.4f, 0.25f)), withCollider: true);
+            AddModel(root, PrimitiveType.Cylinder, new Vector3(0f, 0.06f, 0f), new Vector3(0.05f, 0.015f, 0.05f),
+                SaveMaterial("Terminal", new Color(0.7f, 0.6f, 0.35f)), withCollider: false);
+
+            var item = root.AddComponent<PhysicsItem>();
+            Configure(item, new Dictionary<string, object>
+            {
+                ["displayName"] = "Фильтр",
+                ["holdDistance"] = 1f,
+                ["throwImpulse"] = 3.5f,
+                ["impactNoiseRadius"] = 8f,
+            });
+            root.AddComponent<FilterPickup>();
+
+            return SavePrefab(root, "Filter");
         }
 
         private static GameObject BuildCanPrefab()
@@ -314,7 +340,7 @@ namespace Nuclear.EditorTools
             manager.NetworkConfig.NetworkTransport = transport;
             manager.NetworkConfig.PlayerPrefab = playerPrefab;
             manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
-            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can));
+            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter));
             networkObject.AddComponent<ConnectionMenu>();
 
             // Аккумулятор один, в случайной из трёх точек; ящики и консервы рядом со стартом.
@@ -343,9 +369,21 @@ namespace Nuclear.EditorTools
                     },
                     count = 5,
                 },
+                new ItemSpawner.Entry
+                {
+                    // Один из вариантов — в центре воронки: фильтр за дозу.
+                    prefab = items.Filter,
+                    positions = new[]
+                    {
+                        new Vector3(6f, 0.2f, 10f), new Vector3(-10f, 0.2f, 5f), new Vector3(10f, 0.2f, -2f),
+                        new Vector3(-4f, 0.2f, -12f), new Vector3(16f, 0.2f, 4f), new Vector3(14f, 0.2f, -14f),
+                    },
+                    count = 3,
+                },
             });
 
             BuildGrayLevel();
+            BuildHazards();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -373,6 +411,47 @@ namespace Nuclear.EditorTools
                 float height = 0.25f * (i + 1);
                 Block(level, $"Step {i}", new Vector3(-10f, height / 2f, -4f + i * 0.6f), new Vector3(3f, height, 0.6f));
             }
+        }
+
+        /// <summary>Шлюз бункера с чистым воздухом у старта и два радиоактивных пятна.</summary>
+        private static void BuildHazards()
+        {
+            var hazards = new GameObject("Hazards").transform;
+
+            var airlock = new GameObject("Airlock (safe air)");
+            airlock.transform.SetParent(hazards, false);
+            airlock.transform.localPosition = new Vector3(0f, 2f, 0f);
+            var airlockSize = new Vector3(10f, 5f, 10f);
+            airlock.AddComponent<SafeAirZone>().Configure(airlockSize);
+            Marker(hazards, PrimitiveType.Cube, new Vector3(0f, 0.01f, 0f), new Vector3(airlockSize.x, 0.02f, airlockSize.z),
+                SaveMaterial("Airlock Floor", new Color(0.3f, 0.36f, 0.42f)));
+
+            var radiationMaterial = SaveMaterial("Radiation", new Color(0.55f, 0.6f, 0.2f));
+            RadiationSpot(hazards, "Crater", new Vector3(14f, 0f, -14f), radius: 9f, intensity: 4f, radiationMaterial);
+            RadiationSpot(hazards, "Weak Spot", new Vector3(-14f, 0f, -10f), radius: 6f, intensity: 1.5f, radiationMaterial);
+        }
+
+        private static void RadiationSpot(Transform parent, string name, Vector3 position, float radius, float intensity, Material material)
+        {
+            var zone = new GameObject($"{name} (radiation)");
+            zone.transform.SetParent(parent, false);
+            zone.transform.localPosition = position + Vector3.up;
+            zone.AddComponent<RadiationZone>().Configure(radius, intensity);
+
+            // Пятно на земле на всю зону, чтобы её было видно до появления настоящей графики.
+            Marker(parent, PrimitiveType.Cylinder, position + Vector3.up * 0.015f, new Vector3(radius * 2f, 0.01f, radius * 2f), material);
+        }
+
+        /// <summary>Плоская цветная метка на земле без коллайдера.</summary>
+        private static void Marker(Transform parent, PrimitiveType shape, Vector3 position, Vector3 size, Material material)
+        {
+            var marker = GameObject.CreatePrimitive(shape);
+            marker.name = "Marker";
+            Object.DestroyImmediate(marker.GetComponent<Collider>());
+            marker.transform.SetParent(parent, false);
+            marker.transform.localPosition = position;
+            marker.transform.localScale = size;
+            marker.GetComponent<Renderer>().sharedMaterial = material;
         }
 
         private static GameObject Block(Transform parent, string name, Vector3 position, Vector3 size)

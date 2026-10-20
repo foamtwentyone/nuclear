@@ -39,6 +39,7 @@ namespace Nuclear.Player
 
         private CharacterController controller;
         private PlayerCarry carry;
+        private PlayerSurvival survival;
         private Transform cameraRoot;
         private Vector3 horizontalVelocity;
         private float verticalVelocity;
@@ -49,6 +50,7 @@ namespace Nuclear.Player
             controller = GetComponent<CharacterController>();
             Stamina = GetComponent<PlayerStamina>();
             carry = GetComponent<PlayerCarry>();
+            survival = GetComponent<PlayerSurvival>();
 
             var playerCamera = GetComponentInChildren<Camera>(true);
             cameraRoot = playerCamera.transform;
@@ -101,6 +103,10 @@ namespace Nuclear.Player
 
             if (Cursor.lockState == CursorLockMode.Locked)
                 Look(mouse.delta.ReadValue());
+
+            // Мёртвый может только смотреть по сторонам.
+            if (survival != null && survival.IsDead)
+                return;
 
             Move(keyboard, Time.deltaTime);
         }

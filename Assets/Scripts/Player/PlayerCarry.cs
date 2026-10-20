@@ -36,12 +36,14 @@ namespace Nuclear.Player
         public bool IsHeavyLoad => SpeedMultiplier < heavyThreshold;
 
         private CharacterController body;
+        private PlayerSurvival survival;
         private PhysicsItem ignoredItem;
 
         private void Awake()
         {
             Controller = GetComponent<PlayerController>();
             body = GetComponent<CharacterController>();
+            survival = GetComponent<PlayerSurvival>();
         }
 
         public override void OnNetworkSpawn()
@@ -72,6 +74,12 @@ namespace Nuclear.Player
         {
             if (!IsSpawned || !IsOwner)
                 return;
+
+            if (survival != null && survival.IsDead)
+            {
+                LookTarget = null;
+                return;
+            }
 
             LookTarget = FindItemInView();
 
@@ -106,7 +114,7 @@ namespace Nuclear.Player
         [Rpc(SendTo.Server, RequireOwnership = true)]
         private void GrabRpc(ulong itemId)
         {
-            if (HeldItem != null)
+            if (HeldItem != null || (survival != null && survival.IsDead))
                 return;
 
             if (!NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(itemId, out var itemObject)
@@ -117,6 +125,13 @@ namespace Nuclear.Player
             float distance = Vector3.Distance(Controller.LookOrigin, item.ClosestPoint(Controller.LookOrigin));
             if (distance > grabDistance + 1f)
                 return;
+
+            // Фильтр уходит в карман; если карман полон, его можно нести как обычный предмет.
+            if (item.TryGetComponent(out FilterPickup _) && survival != null && survival.TryStashFilter())
+            {
+                itemObject.Despawn();
+                return;
+            }
 
             if (item.TryAddCarrier(this))
                 heldItemId.Value = itemId;
