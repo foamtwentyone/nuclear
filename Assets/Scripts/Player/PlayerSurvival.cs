@@ -93,6 +93,15 @@ namespace Nuclear.Player
             return true;
         }
 
+        /// <summary>Сервер: отнимает здоровье. При нуле игрок погибает.</summary>
+        public void TakeDamage(float amount)
+        {
+            if (IsDead)
+                return;
+
+            Health.Value = Mathf.Max(0f, Health.Value - amount);
+        }
+
         private void Update()
         {
             if (!IsSpawned)
@@ -132,7 +141,7 @@ namespace Nuclear.Player
                 return;
             }
 
-            Health.Value = Mathf.Max(0f, Health.Value - suffocationDamagePerSecond * deltaTime);
+            TakeDamage(suffocationDamagePerSecond * deltaTime);
 
             if (Time.time >= nextCoughTime)
             {

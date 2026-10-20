@@ -11,6 +11,9 @@ namespace Nuclear.Audio
 
         private static AudioClip click;
         private static AudioClip cough;
+        private static AudioClip growl;
+        private static AudioClip swipe;
+        private static AudioClip breath;
 
         /// <summary>Короткий щелчок счётчика Гейгера.</summary>
         public static AudioClip Click
@@ -32,6 +35,39 @@ namespace Nuclear.Audio
                 if (cough == null)
                     cough = CreateFiltered("Cough", 0.55f, 0.12f, t => Burst(t, 0f, 0.18f) + Burst(t, 0.25f, 0.22f) * 0.8f);
                 return cough;
+            }
+        }
+
+        /// <summary>Низкое рычание, когда Слепыш бросается на звук.</summary>
+        public static AudioClip Growl
+        {
+            get
+            {
+                if (growl == null)
+                    growl = CreateFiltered("Growl", 1.2f, 0.025f, t => Mathf.Sin(Mathf.PI * t / 1.2f) * 1.6f);
+                return growl;
+            }
+        }
+
+        /// <summary>Свист взмаха лапы.</summary>
+        public static AudioClip Swipe
+        {
+            get
+            {
+                if (swipe == null)
+                    swipe = CreateFiltered("Swipe", 0.3f, 0.35f, t => Burst(t, 0f, 0.3f) * 0.6f);
+                return swipe;
+            }
+        }
+
+        /// <summary>Тяжёлое дыхание, зацикленное: по нему Слепыша можно услышать раньше, чем увидеть.</summary>
+        public static AudioClip Breath
+        {
+            get
+            {
+                if (breath == null)
+                    breath = CreateFiltered("Breath", 2.4f, 0.06f, t => Mathf.Pow(Mathf.Sin(Mathf.PI * t / 1.2f), 2f) * 0.5f);
+                return breath;
             }
         }
 

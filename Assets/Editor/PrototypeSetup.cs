@@ -1,8 +1,11 @@
 using System.Collections.Generic;
+using Nuclear.Enemies;
 using Nuclear.Hazards;
 using Nuclear.Items;
 using Nuclear.Network;
 using Nuclear.Player;
+using Nuclear.World;
+using Unity.AI.Navigation;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using Unity.Netcode.Transports.UTP;
@@ -42,6 +45,7 @@ namespace Nuclear.EditorTools
                 Crate = BuildCratePrefab(),
                 Can = BuildCanPrefab(),
                 Filter = BuildFilterPrefab(),
+                BlindOne = BuildBlindOnePrefab(),
             };
             BuildScene(playerPrefab, items);
 
@@ -72,6 +76,7 @@ namespace Nuclear.EditorTools
             root.AddComponent<PlayerCarry>();
             root.AddComponent<PlayerSurvival>();
             root.AddComponent<Dosimeter>();
+            root.AddComponent<PlayerNoise>();
             root.AddComponent<PlayerHud>();
 
             var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
@@ -100,6 +105,7 @@ namespace Nuclear.EditorTools
             public GameObject Crate;
             public GameObject Can;
             public GameObject Filter;
+            public GameObject BlindOne;
         }
 
         private static GameObject BuildBatteryPrefab()
@@ -151,6 +157,41 @@ namespace Nuclear.EditorTools
             });
 
             return SavePrefab(root, "Crate");
+        }
+
+        private static GameObject BuildBlindOnePrefab()
+        {
+            var root = new GameObject("BlindOne");
+
+            var body = root.AddComponent<Rigidbody>();
+            body.isKinematic = true;
+            var capsule = root.AddComponent<CapsuleCollider>();
+            capsule.center = new Vector3(0f, 1.15f, 0f);
+            capsule.height = 2.3f;
+            capsule.radius = 0.4f;
+
+            root.AddComponent<NetworkObject>();
+            var netTransform = root.AddComponent<NetworkTransform>();
+            netTransform.SyncRotAngleX = false;
+            netTransform.SyncRotAngleZ = false;
+            netTransform.SyncScaleX = false;
+            netTransform.SyncScaleY = false;
+            netTransform.SyncScaleZ = false;
+
+            // Высокая сутулая фигура с длинными руками и головой без глаз.
+            var skin = SaveMaterial("BlindOne Skin", new Color(0.75f, 0.7f, 0.65f));
+            AddModel(root, PrimitiveType.Capsule, new Vector3(0f, 1.05f, 0f), new Vector3(0.7f, 1f, 0.55f), skin, withCollider: false);
+            var head = AddModel(root, PrimitiveType.Sphere, new Vector3(0f, 2.15f, 0.12f), new Vector3(0.42f, 0.5f, 0.45f), skin, withCollider: false);
+            head.name = "Head";
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var arm = AddModel(root, PrimitiveType.Cube, new Vector3(0.45f * side, 1.05f, 0.15f), new Vector3(0.12f, 1.2f, 0.12f), skin, withCollider: false);
+                arm.transform.localRotation = Quaternion.Euler(-15f, 0f, 8f * side);
+            }
+
+            root.AddComponent<BlindOne>();
+
+            return SavePrefab(root, "BlindOne");
         }
 
         private static GameObject BuildFilterPrefab()
@@ -340,7 +381,7 @@ namespace Nuclear.EditorTools
             manager.NetworkConfig.NetworkTransport = transport;
             manager.NetworkConfig.PlayerPrefab = playerPrefab;
             manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
-            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter));
+            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter, items.BlindOne));
             networkObject.AddComponent<ConnectionMenu>();
 
             // Аккумулятор один, в случайной из трёх точек; ящики и консервы рядом со стартом.
@@ -380,6 +421,13 @@ namespace Nuclear.EditorTools
                     },
                     count = 3,
                 },
+                new ItemSpawner.Entry
+                {
+                    // Слепыш начинает в дальней части карты, подальше от шлюза.
+                    prefab = items.BlindOne,
+                    positions = new[] { new Vector3(0f, 0f, 22f), new Vector3(-18f, 0f, 16f), new Vector3(20f, 0f, 14f) },
+                    count = 1,
+                },
             });
 
             BuildGrayLevel();
@@ -411,6 +459,18 @@ namespace Nuclear.EditorTools
                 float height = 0.25f * (i + 1);
                 Block(level, $"Step {i}", new Vector3(-10f, height / 2f, -4f + i * 0.6f), new Vector3(3f, height, 0.6f));
             }
+
+            // Сарай без двери: укрытие, чтобы проверить, как стены глушат звук для Слепыша.
+            Block(level, "Shed Back", new Vector3(8f, 1.25f, 20f), new Vector3(5f, 2.5f, 0.3f));
+            Block(level, "Shed Left", new Vector3(5.65f, 1.25f, 18f), new Vector3(0.3f, 2.5f, 4f));
+            Block(level, "Shed Right", new Vector3(10.35f, 1.25f, 18f), new Vector3(0.3f, 2.5f, 4f));
+            Block(level, "Shed Roof", new Vector3(8f, 2.6f, 18f), new Vector3(5f, 0.2f, 4.3f));
+
+            // Навигационная сетка для Слепыша строится по коллайдерам уровня при загрузке.
+            var surface = level.gameObject.AddComponent<NavMeshSurface>();
+            surface.collectObjects = CollectObjects.All;
+            surface.useGeometry = UnityEngine.AI.NavMeshCollectGeometry.PhysicsColliders;
+            level.gameObject.AddComponent<RuntimeNavMesh>();
         }
 
         /// <summary>Шлюз бункера с чистым воздухом у старта и два радиоактивных пятна.</summary>
