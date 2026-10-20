@@ -47,7 +47,7 @@ namespace Nuclear.EditorTools.LowPoly
             // Разметка и пометки
             Hex(0xc9a227), Hex(0x232220), Hex(0xa8352a), Hex(0xd9d6cf),
             // Выживший
-            Hex(0x5b6040), Hex(0x41452f), Hex(0x3f3f40), Hex(0x7a6c52), Hex(0x262626), Hex(0x5f7a6e), Hex(0x2a2420),
+            Hex(0xb5652e), Hex(0x6e3f22), Hex(0x3f3f40), Hex(0x7a6c52), Hex(0x262626), Hex(0x7fa8a0), Hex(0x2a2420),
             // Предметы
             Hex(0x5b6340), Hex(0x434a2f), Hex(0xa88a46), Hex(0xa0603a), Hex(0x55575a), Hex(0x2d3238), Hex(0xc8bfa4), Hex(0x9a4a35),
             // Слепыш

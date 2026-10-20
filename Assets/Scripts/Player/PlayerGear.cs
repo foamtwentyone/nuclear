@@ -72,6 +72,8 @@ namespace Nuclear.Player
 
         /// <summary>Какая ячейка светит (−1 — фонарь выключен).</summary>
         public readonly NetworkVariable<int> LightSlot = new(-1);
+        /// <summary>Ячейка, предмет из которой в руке. Пишет владелец, видят все (модель в руке у других).</summary>
+        public readonly NetworkVariable<int> HeldSlot = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         /// <summary>Перевязка: 0 — не идёт, иначе доля 0..1.</summary>
         public readonly NetworkVariable<float> BandageProgress = new();
 
@@ -95,6 +97,14 @@ namespace Nuclear.Player
         private AudioSource hands;
         private AudioSource personal;
 
+        // Модели предметов в руке: от первого лица (у камеры) и для остальных (в руке тела).
+        private Transform viewmodel, hand;
+        private Vector3 viewmodelRest;
+        private string shownHeld;
+        private Vector3 lastPosition;
+        private float bobPhase, moveAmount;
+        private Vector2 sway;
+
         private PlayerSurvival bandageTarget;
         private int bandageSlot;
         private float bandageStart;
@@ -108,6 +118,10 @@ namespace Nuclear.Player
             var lightTransform = cameraTransform.Find("Flashlight");
             if (lightTransform != null)
                 flashlight = lightTransform.GetComponent<Light>();
+            viewmodel = cameraTransform.Find("Viewmodel");
+            hand = transform.Find("Body/Hand");
+            if (viewmodel != null)
+                viewmodelRest = viewmodel.localPosition;
             hands = SoundSources.Create3D(gameObject, maxDistance: 15f);
             personal = SoundSources.Create2D(gameObject);
         }
@@ -192,10 +206,64 @@ namespace Nuclear.Player
             }
 
             if (IsOwner)
+            {
                 ReadInput();
+                if (HeldSlot.Value != Selected)
+                    HeldSlot.Value = Selected;
+            }
+            UpdateHeldModel();
+            if (IsOwner)
+                AnimateViewmodel();
             else if (FlashlightOn)
                 // У чужих камера выключена; поворачиваем её по взгляду, чтобы луч светил туда, куда игрок смотрит.
                 cameraTransform.localRotation = Quaternion.Euler(controller.LookPitch.Value, 0f, 0f);
+        }
+
+        // ---------- Предмет в руке ----------
+
+        private void UpdateHeldModel()
+        {
+            var slot = Slot(Mathf.Clamp(HeldSlot.Value, 0, SlotCount - 1)).Value;
+            string held = slot.Filled && !survival.IsDead ? slot.Kind.ToString() : null;
+            if (held == shownHeld)
+                return;
+            shownHeld = held;
+            // Свой предмет — у камеры, чужой — в руке модели.
+            Show(viewmodel, IsOwner ? held : null);
+            Show(hand, IsOwner ? null : held);
+        }
+
+        private static void Show(Transform holder, string name)
+        {
+            if (holder == null)
+                return;
+            foreach (Transform child in holder)
+                child.gameObject.SetActive(child.name == name);
+        }
+
+        /// <summary>Предмет у камеры покачивается при ходьбе и чуть отстаёт от поворота мыши.</summary>
+        private void AnimateViewmodel()
+        {
+            if (viewmodel == null)
+                return;
+            float deltaTime = Time.deltaTime;
+            if (deltaTime <= 0f)
+                return;
+
+            Vector3 delta = transform.position - lastPosition;
+            lastPosition = transform.position;
+            delta.y = 0f;
+            float speed = delta.magnitude / deltaTime;
+            moveAmount = Mathf.Lerp(moveAmount, Mathf.Clamp01(speed / 6f), 1f - Mathf.Exp(-8f * deltaTime));
+            bobPhase += deltaTime * (4f + speed * 1.6f);
+
+            var mouse = Mouse.current;
+            Vector2 look = mouse != null && Cursor.lockState == CursorLockMode.Locked ? mouse.delta.ReadValue() : Vector2.zero;
+            sway = Vector2.Lerp(sway, Vector2.ClampMagnitude(look * 0.02f, 1f), 1f - Mathf.Exp(-10f * deltaTime));
+
+            var bob = new Vector3(Mathf.Sin(bobPhase) * 0.012f, -Mathf.Abs(Mathf.Cos(bobPhase)) * 0.014f, 0f) * moveAmount;
+            viewmodel.localPosition = viewmodelRest + bob + new Vector3(-sway.x, -sway.y, 0f) * 0.03f;
+            viewmodel.localRotation = Quaternion.Euler(sway.y * 4f, -sway.x * 4f, 0f);
         }
 
         // ---------- Ввод ----------

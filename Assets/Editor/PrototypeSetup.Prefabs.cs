@@ -60,7 +60,9 @@ namespace Nuclear.EditorTools
             // Тело с опорной точкой в тазу: так его удобно уронить при смерти (см. PlayerSurvival).
             var body = new MeshKit();
             Models.Survivor(body);
-            AddModel(root.transform, "Body", body, new Vector3(0f, 0.9f, 0f), Quaternion.identity);
+            var bodyModel = AddModel(root.transform, "Body", body, new Vector3(0f, 0.9f, 0f), Quaternion.identity);
+            // Предмет в правой руке — его видят другие игроки (PlayerGear включает нужную модель).
+            AddHeldModels(bodyModel.transform, "Hand", Models.SurvivorHand, firstPerson: false);
 
             // Огонёк призрака: виден другим, когда игрок погиб (см. PlayerGhost).
             var wisp = new MeshKit();
@@ -86,6 +88,8 @@ namespace Nuclear.EditorTools
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = FogColor;
             cameraObject.AddComponent<AudioListener>();
+            // Предмет в руке от первого лица — справа внизу кадра, видит только сам игрок.
+            AddHeldModels(cameraObject.transform, "Viewmodel", new Vector3(0.24f, -0.22f, 0.42f), firstPerson: true);
 
             // Фонарь светит из головы туда, куда смотрит игрок (включает PlayerGear).
             var flashlight = new GameObject("Flashlight").AddComponent<Light>();
@@ -105,6 +109,50 @@ namespace Nuclear.EditorTools
 
             return SavePrefab(root, "Player");
         }
+
+        /// <summary>
+        /// Модели всех мелких предметов в одной точке (рука или кадр от первого лица), все выключены.
+        /// Имя модели — имя GearKind: по нему PlayerGear включает предмет из выбранной ячейки.
+        /// </summary>
+        private static void AddHeldModels(Transform parent, string name, Vector3 position, bool firstPerson)
+        {
+            var holder = new GameObject(name);
+            holder.transform.SetParent(parent, false);
+            holder.transform.localPosition = position;
+            foreach (GearKind kind in System.Enum.GetValues(typeof(GearKind)))
+            {
+                var kit = new MeshKit();
+                HeldModel(kind)(kit);
+                var model = AddModel(holder.transform, kind.ToString(), kit, Vector3.zero, HeldRotation(kind, firstPerson));
+                if (firstPerson)
+                {
+                    // Предмет у камеры не должен отбрасывать тень на мир.
+                    foreach (var renderer in model.GetComponentsInChildren<Renderer>(true))
+                        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+                model.SetActive(false);
+            }
+        }
+
+        private static System.Action<MeshKit> HeldModel(GearKind kind) => kind switch
+        {
+            GearKind.Bandage => Models.Bandage,
+            GearKind.Flashlight => Models.Flashlight,
+            GearKind.Crowbar => Models.Crowbar,
+            GearKind.FlashlightBattery => Models.FlashlightBattery,
+            GearKind.Filter => Models.Filter,
+            _ => Models.Can,
+        };
+
+        /// <summary>Как предмет лежит в руке: фонарь светит вперёд, лом поднят наискось, мелочь чуть повёрнута к камере.</summary>
+        private static Quaternion HeldRotation(GearKind kind, bool firstPerson) => kind switch
+        {
+            GearKind.Flashlight => Quaternion.identity,
+            GearKind.Crowbar => Quaternion.FromToRotation(Vector3.right, firstPerson ? new Vector3(-0.35f, 0.8f, 0.45f) : new Vector3(0f, 0.85f, 0.5f)),
+            GearKind.Bandage or GearKind.FlashlightBattery => Quaternion.Euler(10f, -30f, 0f),
+            GearKind.Filter => Quaternion.Euler(15f, 0f, 10f),
+            _ => Quaternion.Euler(10f, 0f, 0f),
+        };
 
         /// <summary>Падающий пепел вокруг игрока. Эмиттер следует за игроком, хлопья остаются в мире.</summary>
         private static void AddAsh(Transform parent)

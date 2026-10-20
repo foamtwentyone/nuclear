@@ -60,6 +60,9 @@ namespace Nuclear.EditorTools
             AssetDatabase.DeleteAsset(MeshFolder);
             EnsureFolder(MeshFolder);
 
+            // Кэши эффектов могли остаться от прошлой сборки (папка мешей пересоздаётся).
+            softTexture = null;
+            domeMesh = null;
             CreateSharedMaterials();
 
             var gear = new GearPrefabs

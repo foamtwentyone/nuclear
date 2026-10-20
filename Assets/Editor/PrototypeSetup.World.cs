@@ -610,7 +610,6 @@ namespace Nuclear.EditorTools
             Models.GlowShards(shards, random, craterBottom + new Vector3(1.2f, 0f, 0.8f), 14, 1.6f);
             Models.GlowShards(shards, random, craterBottom + new Vector3(-1.5f, 0.15f, -1.2f), 8, 1f);
             MarkStatic(AddModel(level, "Crater Shards", shards, Vector3.zero, Quaternion.identity, glowMaterial));
-            AddPointLight(level, "Crater Glow", craterBottom + Vector3.up * 1.2f, new Color(0.5f, 1f, 0.3f), 1.3f, 8f);
 
             var rim = new MeshKit();
             for (int i = 0; i < 14; i++)
@@ -679,78 +678,14 @@ namespace Nuclear.EditorTools
                 light.intensity = 2.2f;
                 light.range = 9f;
                 light.shadows = LightShadows.Soft;
-                light.gameObject.AddComponent<LightFlicker>();
+                Configure(light.gameObject.AddComponent<LightFlicker>(), new Dictionary<string, object>
+                {
+                    ["depth"] = 0.3f,
+                    ["speed"] = 9f,
+                });
 
                 blockedCircles.Add(new Vector3(spot.x, spot.y, 1.5f));
             }
-        }
-
-        /// <summary>Пламя (яркие язычки, тают к верху) и дым над ним.</summary>
-        private static void AddFire(Transform parent, Vector3 position)
-        {
-            var flames = NewParticles(parent, "Flames", position);
-            var main = flames.main;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 0.8f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(0.6f, 1.3f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.35f);
-            main.startColor = new Color(1f, 0.75f, 0.3f, 0.9f);
-            var emission = flames.emission;
-            emission.rateOverTime = 30f;
-            var shape = flames.shape;
-            shape.shapeType = ParticleSystemShapeType.Cone;
-            shape.angle = 8f;
-            shape.radius = 0.18f;
-            shape.rotation = new Vector3(-90f, 0f, 0f);
-            var size = flames.sizeOverLifetime;
-            size.enabled = true;
-            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.2f));
-            var color = flames.colorOverLifetime;
-            color.enabled = true;
-            var gradient = new Gradient();
-            gradient.SetKeys(
-                new[] { new GradientColorKey(new Color(1f, 0.85f, 0.4f), 0f), new GradientColorKey(new Color(1f, 0.4f, 0.1f), 0.5f), new GradientColorKey(new Color(0.4f, 0.1f, 0.05f), 1f) },
-                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.9f, 0.15f), new GradientAlphaKey(0f, 1f) });
-            color.color = gradient;
-
-            var smoke = NewParticles(parent, "Smoke", position + Vector3.up * 0.4f);
-            var smokeMain = smoke.main;
-            smokeMain.startLifetime = new ParticleSystem.MinMaxCurve(3f, 5f);
-            smokeMain.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 0.8f);
-            smokeMain.startSize = new ParticleSystem.MinMaxCurve(0.4f, 0.7f);
-            smokeMain.startColor = new Color(0.25f, 0.24f, 0.23f, 0.35f);
-            var smokeEmission = smoke.emission;
-            smokeEmission.rateOverTime = 5f;
-            var smokeShape = smoke.shape;
-            smokeShape.shapeType = ParticleSystemShapeType.Cone;
-            smokeShape.angle = 12f;
-            smokeShape.radius = 0.2f;
-            smokeShape.rotation = new Vector3(-90f, 0f, 0f);
-            var smokeSize = smoke.sizeOverLifetime;
-            smokeSize.enabled = true;
-            smokeSize.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 2.5f));
-            var smokeColor = smoke.colorOverLifetime;
-            smokeColor.enabled = true;
-            var fade = new Gradient();
-            fade.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(0f, 1f) });
-            smokeColor.color = fade;
-        }
-
-        private static ParticleSystem NewParticles(Transform parent, string name, Vector3 position)
-        {
-            var holder = new GameObject(name);
-            holder.transform.SetParent(parent, false);
-            holder.transform.localPosition = position;
-            var particles = holder.AddComponent<ParticleSystem>();
-            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            var main = particles.main;
-            main.loop = true;
-            main.prewarm = true;
-            main.playOnAwake = true;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            holder.GetComponent<ParticleSystemRenderer>().sharedMaterial = ParticleMaterial();
-            return particles;
         }
 
         private static void AddRadiationZone(Transform parent, string name, Vector3 position, float radius, float intensity)
@@ -759,6 +694,7 @@ namespace Nuclear.EditorTools
             zone.transform.SetParent(parent, false);
             zone.transform.localPosition = position;
             zone.AddComponent<RadiationZone>().Configure(radius, intensity);
+            AddRadiationVisuals(parent, new Vector2(position.x, position.z), radius, intensity);
         }
 
         private static void AddPointLight(Transform parent, string name, Vector3 position, Color color, float intensity, float range)

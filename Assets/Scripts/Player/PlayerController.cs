@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 namespace Nuclear.Player
 {
     /// <summary>
-    /// Игрок от первого лица: ходьба, бег, прыжок, обзор мышью.
+    /// Игрок от первого лица: ходьба, бег (тратит выносливость), прыжок, обзор мышью.
     /// С тяжёлым грузом ходит медленнее и не может бегать и прыгать.
     /// Движение считает только владелец; позицию раздаёт OwnerNetworkTransform.
     /// </summary>
@@ -17,7 +17,6 @@ namespace Nuclear.Player
         [SerializeField] private float sprintSpeed = 7f;
         [SerializeField] private float acceleration = 12f;
         [SerializeField] private float jumpHeight = 1.1f;
-        [SerializeField] private float jumpStaminaCost = 15f;
         [SerializeField] private float gravity = -20f;
 
         [Header("Обзор")]
@@ -158,7 +157,8 @@ namespace Nuclear.Player
             if (grounded && verticalVelocity < 0f)
                 verticalVelocity = -2f; // Прижимаем к земле, чтобы isGrounded не мигал на склонах.
 
-            if (grounded && !heavyLoad && keyboard.spaceKey.wasPressedThisFrame && Stamina.TrySpend(jumpStaminaCost))
+            // Прыжок бесплатный: выносливость тратит только бег.
+            if (grounded && !heavyLoad && keyboard.spaceKey.wasPressedThisFrame)
                 verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
             verticalVelocity += gravity * deltaTime;
