@@ -58,6 +58,15 @@ namespace Nuclear.Visuals
             GUI.color = new Color(0.02f, 0.03f, 0.02f, Mathf.Clamp01(strength));
             GUI.DrawTexture(screen, Vignette, ScaleMode.StretchToFill);
 
+            // Призрак видит мир холодным и выцветшим.
+            if (survival != null && survival.IsDead)
+            {
+                GUI.color = new Color(0.55f, 0.75f, 0.95f, 0.10f);
+                GUI.DrawTexture(screen, Texture2D.whiteTexture);
+                GUI.color = new Color(0.25f, 0.4f, 0.6f, 0.5f);
+                GUI.DrawTexture(screen, Vignette, ScaleMode.StretchToFill);
+            }
+
             if (flash > 0f)
             {
                 GUI.color = new Color(0.6f, 0.05f, 0.03f, flash * 0.6f);

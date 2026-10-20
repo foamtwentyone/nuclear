@@ -35,6 +35,7 @@ namespace Nuclear.EditorTools
         /// <summary>Материал с процедурной текстурой для каждого цвета палитры.</summary>
         private static readonly Dictionary<Swatch, Material> surfaceMaterials = new();
         private static Material glowMaterial;
+        private static Material ghostMaterial;
         private static Material outlineMaterial;
 
         [MenuItem("Nuclear/Собрать сцену прототипа")]
@@ -141,6 +142,7 @@ namespace Nuclear.EditorTools
             }
 
             glowMaterial = SaveMaterial("Toxic Glow", new Color(0.55f, 1f, 0.35f), emission: new Color(0.6f, 1.6f, 0.3f));
+            ghostMaterial = SaveMaterial("Ghost", new Color(0.75f, 0.88f, 1f), emission: new Color(0.55f, 0.8f, 1.3f));
             outlineMaterial = SaveOutlineMaterial();
         }
 

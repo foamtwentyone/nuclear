@@ -111,12 +111,12 @@ namespace Nuclear.Player
                      && !Network.ConnectionMenu.IsPointerOver(mouse.position.ReadValue()))
                 SetCursorLocked(true);
 
-            if (Cursor.lockState == CursorLockMode.Locked)
-                Look(mouse.delta.ReadValue());
-
-            // Мёртвый может только смотреть по сторонам.
+            // Мёртвым управляет PlayerGhost: тело лежит, камера летает.
             if (survival != null && survival.IsDead)
                 return;
+
+            if (Cursor.lockState == CursorLockMode.Locked)
+                Look(mouse.delta.ReadValue());
 
             Move(keyboard, Time.deltaTime);
         }

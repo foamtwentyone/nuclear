@@ -20,6 +20,7 @@ namespace Nuclear.Player
         private PlayerSurvival survival;
         private Dosimeter dosimeter;
         private PlayerVoice voice;
+        private PlayerGhost ghost;
         private GUIStyle hintStyle;
         private GUIStyle statusStyle;
         private GUIStyle deathStyle;
@@ -32,6 +33,7 @@ namespace Nuclear.Player
             survival = GetComponent<PlayerSurvival>();
             dosimeter = GetComponent<Dosimeter>();
             voice = GetComponent<PlayerVoice>();
+            ghost = GetComponent<PlayerGhost>();
         }
 
         private void OnGUI()
@@ -39,7 +41,7 @@ namespace Nuclear.Player
             if (player == null || !player.IsSpawned || !player.IsOwner)
                 return;
 
-            hintStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 16 };
+            hintStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 16, richText = true };
             statusStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerLeft, fontSize = 15, richText = true };
             deathStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 32, richText = true };
             bannerStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperCenter, fontSize = 18, richText = true };
@@ -49,7 +51,7 @@ namespace Nuclear.Player
 
             if (survival != null && survival.IsDead)
             {
-                GUI.Label(new Rect(0f, 0f, Screen.width, Screen.height), "Вы погибли", deathStyle);
+                DrawGhost();
                 return;
             }
 
@@ -73,6 +75,24 @@ namespace Nuclear.Player
             text += "\n<size=16>«Выйти» и «Создать игру» — начать заново</size>";
             GUI.Label(new Rect(0f, 0f, Screen.width, Screen.height), text, deathStyle);
             return true;
+        }
+
+        private void DrawGhost()
+        {
+            GUI.Label(new Rect(0f, 24f, Screen.width, 60f),
+                "<color=#a8c8f0>Вы погибли и стали призраком</color>\n<size=16>Слепыш вас не слышит. Подсказывайте живым, где он</size>", bannerStyle);
+            DrawCrosshair();
+            if (ghost == null)
+                return;
+
+            float left = ghost.DistractCooldownLeft;
+            string hint = left > 0f
+                ? $"Шорох будет готов через {Mathf.CeilToInt(left)} с"
+                : "ЛКМ — шорох там, куда смотрите (до 15 м): Слепыш пойдёт проверить";
+            if (Time.time - ghost.LastMissTime < 2f)
+                hint = "<color=#e6b84d>Слишком далеко — подлетите ближе</color>";
+            hint += "\n<size=13>WASD — лететь, Пробел / Ctrl — вверх / вниз, Shift — быстрее. Не дальше 25 м от живых</size>";
+            GUI.Label(new Rect(0f, Screen.height / 2f + 30f, Screen.width, 60f), hint, hintStyle);
         }
 
         private void DrawDoorBanner()

@@ -174,7 +174,7 @@ namespace Nuclear.Player
         }
 
         /// <summary>
-        /// Мёртвый игрок лежит: тело заваливается, камера опускается к земле.
+        /// Мёртвый игрок лежит: тело заваливается, камеру забирает призрак (PlayerGhost).
         /// Поза обратима, на случай если клиент увидел нулевое здоровье до первой синхронизации.
         /// </summary>
         private void ApplyPose()
@@ -187,9 +187,6 @@ namespace Nuclear.Player
                 body.localPosition = new Vector3(0f, dead ? 0.35f : 0.9f, 0f);
                 body.localRotation = dead ? Quaternion.Euler(90f, 0f, 0f) : Quaternion.identity;
             }
-
-            var cameraTransform = GetComponentInChildren<Camera>(true).transform;
-            cameraTransform.localPosition = new Vector3(0f, dead ? 0.3f : 1.6f, 0f);
         }
     }
 }

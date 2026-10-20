@@ -44,12 +44,27 @@ namespace Nuclear.EditorTools
             root.AddComponent<PlayerVoice>();
             root.AddComponent<PlayerAudio>();
             root.AddComponent<ScreenEffects>();
+            root.AddComponent<PlayerGhost>();
             root.AddComponent<PlayerHud>();
 
             // Тело с опорной точкой в тазу: так его удобно уронить при смерти (см. PlayerSurvival).
             var body = new MeshKit();
             Models.Survivor(body);
             AddModel(root.transform, "Body", body, new Vector3(0f, 0.9f, 0f), Quaternion.identity);
+
+            // Огонёк призрака: виден другим, когда игрок погиб (см. PlayerGhost).
+            var wisp = new MeshKit();
+            var wispRandom = new System.Random(5);
+            wisp.Ellipsoid(Vector3.zero, Quaternion.identity, new Vector3(0.22f, 0.26f, 0.22f), 8, 12, new[] { Swatch.Teeth }, wispRandom);
+            wisp.Ellipsoid(new Vector3(0f, -0.3f, 0f), Quaternion.identity, new Vector3(0.1f, 0.18f, 0.1f), 6, 10, new[] { Swatch.Teeth }, wispRandom);
+            var ghostObject = AddModel(root.transform, "Ghost", wisp, new Vector3(0f, 1.6f, 0f), Quaternion.identity, ghostMaterial);
+            var ghostRenderer = ghostObject.GetComponent<MeshRenderer>();
+            ghostRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var ghostLight = ghostObject.AddComponent<Light>();
+            ghostLight.type = LightType.Point;
+            ghostLight.color = new Color(0.6f, 0.8f, 1f);
+            ghostLight.intensity = 0.6f;
+            ghostLight.range = 3f;
 
             var cameraObject = new GameObject("Camera");
             cameraObject.transform.SetParent(root.transform, false);
