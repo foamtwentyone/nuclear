@@ -107,7 +107,8 @@ namespace Nuclear.Player
 
             if (keyboard.escapeKey.wasPressedThisFrame)
                 SetCursorLocked(false);
-            else if (mouse.leftButton.wasPressedThisFrame && Cursor.lockState != CursorLockMode.Locked)
+            else if (mouse.leftButton.wasPressedThisFrame && Cursor.lockState != CursorLockMode.Locked
+                     && !Network.ConnectionMenu.IsPointerOver(mouse.position.ReadValue()))
                 SetCursorLocked(true);
 
             if (Cursor.lockState == CursorLockMode.Locked)

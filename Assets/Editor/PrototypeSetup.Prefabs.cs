@@ -41,6 +41,7 @@ namespace Nuclear.EditorTools
             root.AddComponent<PlayerSurvival>();
             root.AddComponent<Dosimeter>();
             root.AddComponent<PlayerNoise>();
+            root.AddComponent<PlayerVoice>();
             root.AddComponent<PlayerAudio>();
             root.AddComponent<ScreenEffects>();
             root.AddComponent<PlayerHud>();

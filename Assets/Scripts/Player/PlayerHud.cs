@@ -1,5 +1,6 @@
 using Nuclear.Items;
 using Nuclear.Level;
+using Nuclear.Voice;
 using UnityEngine;
 
 namespace Nuclear.Player
@@ -18,6 +19,7 @@ namespace Nuclear.Player
         private PlayerCarry carry;
         private PlayerSurvival survival;
         private Dosimeter dosimeter;
+        private PlayerVoice voice;
         private GUIStyle hintStyle;
         private GUIStyle statusStyle;
         private GUIStyle deathStyle;
@@ -29,6 +31,7 @@ namespace Nuclear.Player
             carry = GetComponent<PlayerCarry>();
             survival = GetComponent<PlayerSurvival>();
             dosimeter = GetComponent<Dosimeter>();
+            voice = GetComponent<PlayerVoice>();
         }
 
         private void OnGUI()
@@ -160,7 +163,14 @@ namespace Nuclear.Player
             if (dosimeter != null && dosimeter.Intensity > 0.01f)
                 dose += $"  <color=#d4e64d>фон {dosimeter.Intensity:0.0}/с</color>";
 
-            GUI.Label(new Rect(16f, Screen.height - 96f, 420f, 80f), $"{air}\n{spare}\n{dose}", statusStyle);
+            string voiceLine = voice == null ? "" : voice.Current switch
+            {
+                Loudness.Shout => "\n<color=#e64d33>Голос: КРИК — слышно за 20 м</color>",
+                Loudness.Speech => "\n<color=#e6b84d>Голос: слышно за 8 м</color>",
+                _ => "",
+            };
+
+            GUI.Label(new Rect(16f, Screen.height - 116f, 420f, 100f), $"{air}\n{spare}\n{dose}{voiceLine}", statusStyle);
         }
 
         private void DrawHint()
