@@ -6,6 +6,7 @@ namespace Nuclear.Player
 {
     /// <summary>
     /// Игрок от первого лица: ходьба, бег, прыжок, обзор мышью.
+    /// С тяжёлым грузом ходит медленнее и не может бегать и прыгать.
     /// Движение считает только владелец; позицию раздаёт OwnerNetworkTransform.
     /// </summary>
     [RequireComponent(typeof(CharacterController), typeof(PlayerStamina))]
@@ -27,9 +28,17 @@ namespace Nuclear.Player
         public readonly NetworkVariable<bool> IsSprinting = new(
             false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+        /// <summary>Наклон взгляда вверх-вниз. Нужен серверу, чтобы знать, куда игрок держит предмет.</summary>
+        public readonly NetworkVariable<float> LookPitch = new(
+            0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
         public PlayerStamina Stamina { get; private set; }
 
+        public Vector3 LookOrigin => cameraRoot.position;
+        public Vector3 LookDirection => transform.rotation * Quaternion.Euler(LookPitch.Value, 0f, 0f) * Vector3.forward;
+
         private CharacterController controller;
+        private PlayerCarry carry;
         private Transform cameraRoot;
         private Vector3 horizontalVelocity;
         private float verticalVelocity;
@@ -39,6 +48,7 @@ namespace Nuclear.Player
         {
             controller = GetComponent<CharacterController>();
             Stamina = GetComponent<PlayerStamina>();
+            carry = GetComponent<PlayerCarry>();
 
             var playerCamera = GetComponentInChildren<Camera>(true);
             cameraRoot = playerCamera.transform;
@@ -100,6 +110,9 @@ namespace Nuclear.Player
             transform.Rotate(Vector3.up, delta.x * mouseSensitivity);
             pitch = Mathf.Clamp(pitch - delta.y * mouseSensitivity, -maxPitch, maxPitch);
             cameraRoot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+
+            if (Mathf.Abs(LookPitch.Value - pitch) > 0.5f)
+                LookPitch.Value = pitch;
         }
 
         private void Move(Keyboard keyboard, float deltaTime)
@@ -111,7 +124,8 @@ namespace Nuclear.Player
 
             bool grounded = controller.isGrounded;
             bool wantsSprint = keyboard.leftShiftKey.isPressed && input.y > 0f;
-            bool sprinting = wantsSprint && grounded && Stamina.CanSprint;
+            bool heavyLoad = carry != null && carry.IsHeavyLoad;
+            bool sprinting = wantsSprint && grounded && !heavyLoad && Stamina.CanSprint;
 
             if (sprinting)
                 Stamina.DrainSprint(deltaTime);
@@ -121,14 +135,14 @@ namespace Nuclear.Player
             if (IsSprinting.Value != sprinting)
                 IsSprinting.Value = sprinting;
 
-            float speed = sprinting ? sprintSpeed : walkSpeed;
+            float speed = (sprinting ? sprintSpeed : walkSpeed) * (carry != null ? carry.SpeedMultiplier : 1f);
             Vector3 target = (transform.right * input.x + transform.forward * input.y) * speed;
             horizontalVelocity = Vector3.MoveTowards(horizontalVelocity, target, acceleration * speed * deltaTime);
 
             if (grounded && verticalVelocity < 0f)
                 verticalVelocity = -2f; // Прижимаем к земле, чтобы isGrounded не мигал на склонах.
 
-            if (grounded && keyboard.spaceKey.wasPressedThisFrame && Stamina.TrySpend(jumpStaminaCost))
+            if (grounded && !heavyLoad && keyboard.spaceKey.wasPressedThisFrame && Stamina.TrySpend(jumpStaminaCost))
                 verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
             verticalVelocity += gravity * deltaTime;
