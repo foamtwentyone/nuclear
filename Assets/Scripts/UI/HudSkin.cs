@@ -4,7 +4,7 @@ namespace Nuclear.UI
 {
     /// <summary>
     /// Оформление меню (подключение, микрофон) в духе минималистичного HUD: тёмные полупрозрачные панели,
-    /// кнопки со светлой рамкой при наведении, шрифты Rubik и Russo One.
+    /// кнопки со светлой рамкой при наведении, рукописный шрифт Neucha.
     /// </summary>
     public static class HudSkin
     {
@@ -17,10 +17,9 @@ namespace Nuclear.UI
 
             skin = Object.Instantiate(GUI.skin);
             skin.hideFlags = HideFlags.DontSave;
-            var body = Resources.Load<Font>("Fonts/Rubik");
-            var heading = Resources.Load<Font>("Fonts/RussoOne-Regular");
-            if (body != null)
-                skin.font = body;
+            var hand = Resources.Load<Font>("Fonts/Neucha");
+            if (hand != null)
+                skin.font = hand;
 
             var ink = HudDraw.Ink;
             var cream = HudDraw.Cream;
@@ -30,10 +29,10 @@ namespace Nuclear.UI
             var field = new Color(0.03f, 0.03f, 0.03f, 0.85f);
             var faint = new Color(1f, 1f, 1f, 0.15f);
 
-            Style(skin.box, Rounded(panel, faint, 1f, 10f), cream, 14);
+            Style(skin.box, Rounded(panel, faint, 1f, 10f), cream, 17);
             skin.box.padding = new RectOffset(12, 12, 10, 10);
 
-            Style(skin.button, Rounded(steel, faint, 1f, 8f), cream, 15);
+            Style(skin.button, Rounded(steel, faint, 1f, 8f), cream, 18);
             skin.button.hover.background = Rounded(new Color(0.22f, 0.22f, 0.2f, 0.95f), cream, 1.5f, 8f);
             skin.button.hover.textColor = Color.white;
             skin.button.active.background = Rounded(new Color(0.1f, 0.1f, 0.1f, 0.95f), accent, 1.5f, 8f);
@@ -42,12 +41,10 @@ namespace Nuclear.UI
             skin.button.onNormal = skin.button.normal;
             skin.button.onHover = skin.button.hover;
             skin.button.onActive = skin.button.active;
-            if (heading != null)
-                skin.button.font = heading;
             skin.button.fixedHeight = 32f;
             skin.button.margin = new RectOffset(4, 4, 4, 4);
 
-            Style(skin.textField, Rounded(field, faint, 1f, 6f), cream, 15);
+            Style(skin.textField, Rounded(field, faint, 1f, 6f), cream, 18);
             skin.textField.hover = skin.textField.normal;
             skin.textField.focused.background = Rounded(field, cream, 1.5f, 6f);
             skin.textField.focused.textColor = Color.white;
@@ -55,7 +52,7 @@ namespace Nuclear.UI
             skin.textField.fixedHeight = 30f;
 
             skin.label.normal.textColor = cream;
-            skin.label.fontSize = 14;
+            skin.label.fontSize = 17;
 
             // Галочка: пустой квадрат и залитый светлый.
             var off = Rounded(field, new Color(1f, 1f, 1f, 0.4f), 1.5f, 5f, 24);
@@ -73,7 +70,7 @@ namespace Nuclear.UI
             skin.toggle.border = new RectOffset(8, 8, 8, 8);
             skin.toggle.padding = new RectOffset(30, 0, 4, 4);
             skin.toggle.overflow = new RectOffset(0, 0, 0, 0);
-            skin.toggle.fontSize = 14;
+            skin.toggle.fontSize = 17;
 
             skin.horizontalSlider.normal.background = Rounded(field, faint, 1f, 4f);
             skin.horizontalSlider.border = new RectOffset(6, 6, 4, 4);

@@ -19,7 +19,7 @@ namespace Nuclear.UI
     /// <summary>
     /// Иконки HUD как поля расстояний (без Unity, чтобы их можно было проверить вне редактора).
     /// Координаты в квадрате [-1, 1], y вверх; расстояние отрицательно внутри фигуры.
-    /// Растр: белая заливка с лёгким градиентом и тёмная обводка, как у контуров в мире.
+    /// Растр: белая заливка с лёгким градиентом и тёмная обводка неровной толщины, как маркером.
     /// </summary>
     public static class HudIconShapes
     {
@@ -37,7 +37,9 @@ namespace Nuclear.UI
                     float py = (y + 0.5f) / size * 2f - 1f;
                     float d = Distance(icon, px, py);
                     float fill = Clamp01(0.5f - d / pixel);
-                    float shape = Clamp01(0.5f - (d - Outline) / pixel);
+                    // Толщина обводки «гуляет», как у линии маркером.
+                    float wobble = 1f + 0.35f * (MathF.Sin(px * 7.3f + py * 2.1f) * 0.6f + MathF.Sin(py * 11.7f - px * 4.3f) * 0.4f);
+                    float shape = Clamp01(0.5f - (d - Outline * wobble) / pixel);
                     // Сверху светлее, снизу чуть темнее — объём как у мультяшных иконок.
                     float shade = 0.84f + 0.16f * Clamp01(py * 0.5f + 0.5f);
                     float value = fill * shade;

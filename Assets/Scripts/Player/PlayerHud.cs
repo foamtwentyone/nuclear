@@ -7,15 +7,16 @@ using UnityEngine;
 namespace Nuclear.Player
 {
     /// <summary>
-    /// Минималистичный HUD своего игрока: без подложек, только иконки, тонкие полоски и текст с обводкой.
-    /// Слева внизу — здоровье, фильтр, выносливость (видна, пока тратится) и доза (видна, когда важна);
-    /// по центру внизу — 4 ячейки инвентаря, название предмета появляется при выборе и гаснет;
-    /// под прицелом — подсказки «[клавиша] действие»; сверху — состояние двери; поверх всего — итог уровня.
+    /// HUD своего игрока в духе Peak, но как «тетрадь выжившего»: всё нарисовано маркером от руки (HudDraw).
+    /// Слева внизу — одна полоса жизни (радиация съедает её справа штриховкой, удушье пульсирует у края),
+    /// над ней штрих выносливости, значки фильтра и дозы, штамп «НЕТ ФИЛЬТРА»; по центру внизу — 4 бумажных
+    /// кружка инвентаря, название выбранного предмета подписано от руки и гаснет; под прицелом — подсказки.
     /// </summary>
     public class PlayerHud : MonoBehaviour
     {
-        private static readonly Color HealthColor = new(0.92f, 0.3f, 0.26f);
+        private static readonly Color HealthColor = new(0.88f, 0.27f, 0.22f);
         private static readonly Color StaminaColor = new(0.98f, 0.84f, 0.4f);
+        private static readonly Color FilterColor = new(0.45f, 0.7f, 0.6f);
         private static readonly Color SafeAirColor = new(0.55f, 0.8f, 1f);
         private static readonly Color RadiationColor = new(0.85f, 0.95f, 0.4f);
         private static readonly Color Alarm = new(1f, 0.38f, 0.28f);
@@ -117,7 +118,7 @@ namespace Nuclear.Player
 
         // ---------- Итог, призрак, дверь ----------
 
-        /// <summary>Итог уровня поверх всего. Возвращает true, если уровень закончен.</summary>
+        /// <summary>Итог уровня поверх всего — большой штамп. Возвращает true, если уровень закончен.</summary>
         private bool DrawOutcome()
         {
             var outcome = LevelOutcome.Current;
@@ -125,36 +126,38 @@ namespace Nuclear.Player
                 return false;
 
             bool won = outcome.Value.Value == LevelOutcome.Result.Won;
-            float h = Screen.height;
-            HudDraw.Fill(new Rect(0f, 0f, Screen.width, h), new Color(0f, 0f, 0f, 0.45f));
-            HudDraw.Text(new Rect(0f, h * 0.42f, Screen.width, h * 0.08f),
-                won ? "Вы добрались до Бункера-12" : "Все погибли", 44f, won ? Good : Alarm, TextAnchor.MiddleCenter);
-            HudDraw.Text(new Rect(0f, h * 0.5f, Screen.width, h * 0.05f),
-                "«Выйти» и «Создать игру» — начать заново", 17f, HudDraw.Dim, TextAnchor.MiddleCenter, HudDraw.Face.Body);
+            float h = Screen.height, s = HudDraw.Scale;
+            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, h), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, new Color(0f, 0f, 0f, 0.5f), 0f, 0f);
+            var center = new Vector2(Screen.width / 2f, h * 0.45f);
+            HudDraw.Stamp(center, won ? "ДОБРАЛИСЬ" : "ВСЕ ПОГИБЛИ", 54f, won ? new Color(0.35f, 0.75f, 0.3f, 0.95f) : HudDraw.StampRed, -5f, 900);
+            HudDraw.Text(new Rect(0f, center.y + 70f * s, Screen.width, 36f * s),
+                won ? "Бункер-12 открыт. Вы внутри." : "Забег окончен", 26f, HudDraw.Cream, TextAnchor.MiddleCenter);
+            HudDraw.Text(new Rect(0f, center.y + 104f * s, Screen.width, 30f * s),
+                "«Выйти» и «Создать игру» — начать заново", 19f, HudDraw.Dim, TextAnchor.MiddleCenter);
             return true;
         }
 
         private void DrawGhost()
         {
             float s = HudDraw.Scale;
-            var ghostBlue = new Color(0.68f, 0.82f, 0.98f);
-            HudDraw.Text(new Rect(0f, 30f * s, Screen.width, 34f * s), "Вы призрак", 24f, ghostBlue, TextAnchor.MiddleCenter);
-            HudDraw.Text(new Rect(0f, 62f * s, Screen.width, 24f * s), "Слепыш вас не слышит. Подсказывайте живым, где он",
-                15f, HudDraw.Dim, TextAnchor.MiddleCenter, HudDraw.Face.Body);
+            var ghostBlue = new Color(0.72f, 0.85f, 1f);
+            HudDraw.Text(new Rect(0f, 26f * s, Screen.width, 40f * s), "Вы призрак", 32f, ghostBlue, TextAnchor.MiddleCenter);
+            HudDraw.Text(new Rect(0f, 64f * s, Screen.width, 28f * s), "Слепыш вас не слышит. Подсказывайте живым, где он",
+                19f, HudDraw.Dim, TextAnchor.MiddleCenter);
             DrawCrosshair();
             if (ghost == null)
                 return;
 
-            var center = new Vector2(Screen.width / 2f, Screen.height / 2f + 44f * s);
+            var center = new Vector2(Screen.width / 2f, Screen.height / 2f + 50f * s);
             float left = ghost.DistractCooldownLeft;
             if (Time.time - ghost.LastMissTime < 2f)
-                HudDraw.KeyHints(center, 16f, Amber, ("", "Слишком далеко — подлетите ближе"));
+                HudDraw.KeyHints(center, 22f, Amber, ("", "Слишком далеко — подлетите ближе"));
             else if (left > 0f)
-                HudDraw.KeyHints(center, 16f, HudDraw.Dim, ("", $"Шорох через {Mathf.CeilToInt(left)} с"));
+                HudDraw.KeyHints(center, 22f, HudDraw.Dim, ("", $"Шорох через {Mathf.CeilToInt(left)} с"));
             else
-                HudDraw.KeyHints(center, 16f, HudDraw.Cream, ("ЛКМ", "шорох там, куда смотрите"));
+                HudDraw.KeyHints(center, 22f, HudDraw.Cream, ("ЛКМ", "шорох там, куда смотрите"));
 
-            HudDraw.KeyHints(new Vector2(Screen.width / 2f, Screen.height - 40f * s), 14f, HudDraw.Dim,
+            HudDraw.KeyHints(new Vector2(Screen.width / 2f, Screen.height - 46f * s), 19f, HudDraw.Dim,
                 ("WASD", "лететь"), ("Пробел", "вверх"), ("Ctrl", "вниз"), ("Shift", "быстрее"));
         }
 
@@ -169,11 +172,11 @@ namespace Nuclear.Player
             switch (door.State.Value)
             {
                 case BunkerDoor.DoorState.Opening:
-                    text = "Дверь открывается — держитесь";
+                    text = "Дверь открывается — держитесь!";
                     color = Amber;
                     break;
                 case BunkerDoor.DoorState.Open:
-                    text = "Дверь открыта — все внутрь";
+                    text = "Дверь открыта — все внутрь!";
                     color = Good;
                     break;
                 default:
@@ -190,9 +193,9 @@ namespace Nuclear.Player
                 return;
 
             float s = HudDraw.Scale;
-            HudDraw.Text(new Rect(0f, 28f * s, Screen.width, 30f * s), text, 18f, color, TextAnchor.MiddleCenter);
+            HudDraw.Text(new Rect(0f, 22f * s, Screen.width, 40f * s), text, 28f, color, TextAnchor.MiddleCenter);
             if (door.State.Value == BunkerDoor.DoorState.Opening)
-                HudDraw.Bar(new Rect((Screen.width - 240f * s) / 2f, 62f * s, 240f * s, 5f * s), door.Progress.Value, Amber);
+                HudDraw.Bar(new Rect((Screen.width - 280f * s) / 2f, 66f * s, 280f * s, 18f * s), door.Progress.Value, Amber, 300);
         }
 
         // ---------- Прицел ----------
@@ -202,102 +205,98 @@ namespace Nuclear.Player
             bool interactive = !survival.IsDead && ((carry != null && (carry.LookTarget != null || carry.HeldItem != null))
                 || (pry != null && pry.LookHood != null) || (gear != null && gear.LookingAtTeammate));
             var center = new Vector2(Screen.width / 2f, Screen.height / 2f);
+            float s = HudDraw.Scale;
             if (interactive)
             {
-                float ring = HudDraw.S(18f);
-                var rect = new Rect(center.x - ring / 2f, center.y - ring / 2f, ring, ring);
-                HudDraw.Frame(rect, new Color(0f, 0f, 0f, 0.5f), HudDraw.S(3.5f), ring / 2f);
-                HudDraw.Frame(HudDraw.HudInset(rect, HudDraw.S(1f)), HudDraw.WithAlpha(HudDraw.Cream, 0.9f), HudDraw.S(1.5f), ring / 2f);
+                var ring = HudSketch.Circle(center, 11f * s, 7 + HudSketch.Boil / 31 % 3, 1f * s);
+                HudSketch.Stroke(ring, 5f * s, HudDraw.WithAlpha(HudDraw.Ink, 0.7f), true, 7);
+                HudSketch.Stroke(ring, 2.2f * s, HudDraw.Cream, true, 7);
             }
-            HudDraw.Circle(center, HudDraw.S(3f), new Color(0f, 0f, 0f, 0.5f));
-            HudDraw.Circle(center, HudDraw.S(1.8f), HudDraw.WithAlpha(HudDraw.Cream, 0.9f));
+            HudSketch.Fill(HudSketch.Circle(center, 3.6f * s, 3, 0f), HudDraw.WithAlpha(HudDraw.Ink, 0.7f));
+            HudSketch.Fill(HudSketch.Circle(center, 2.2f * s, 3, 0f), HudDraw.Cream);
         }
 
         // ---------- Здоровье, фильтр, выносливость, доза ----------
 
+        private bool Choking => !survival.InSafeAir && (survival.IsSwappingFilter.Value || survival.FilterTime.Value <= 0f);
+
         private void DrawVitals()
         {
             float s = HudDraw.Scale;
-            float x = 36f * s;
-            float healthY = Screen.height - 58f * s;
+            float x = 40f * s;
+            float baseY = Screen.height - 54f * s;
 
-            // Фильтр — над здоровьем: иконка и время (или состояние).
-            DrawFilter(x, healthY - 34f * s);
-
-            // Здоровье: светлый «хвост» недавнего урона, справа тусклым — съеденное радиацией.
+            // Полоса жизни, как в Peak: радиация съедает её справа (штриховка), удушье пульсирует фиолетовым у края.
             float health = survival.Health.Value;
             bool critical = health < 30f;
             var healthColor = critical ? Color.Lerp(HealthColor, Alarm, HudDraw.Blink(9f)) : HealthColor;
-            float heart = 22f * s * (critical ? 1f + 0.15f * HudDraw.Blink(9f) : 1f);
-            HudDraw.Icon(new Rect(x + 11f * s - heart / 2f, healthY + 5f * s - heart / 2f, heart, heart), HudIcon.Heart, healthColor);
-            HudDraw.Bar(new Rect(x + 32f * s, healthY + 1f * s, 210f * s, 8f * s), health / 100f, healthColor,
-                1f - survival.MaxHealth / 100f, healthTrail / 100f);
-            HudDraw.Text(new Rect(x + 252f * s, healthY - 8f * s, 60f * s, 26f * s), Mathf.CeilToInt(health).ToString(), 16f, HudDraw.Cream);
+            var bar = new Rect(x + 30f * s, baseY - 15f * s, 300f * s, 30f * s);
+            HudDraw.Bar(bar, health / 100f, healthColor, 100, 1f - survival.MaxHealth / 100f, healthTrail / 100f,
+                Choking ? 0.15f : 0f);
+            float heart = 50f * s * (critical ? 1f + 0.12f * HudDraw.Blink(9f) : 1f);
+            HudDraw.Icon(new Rect(x + 22f * s - heart / 2f, baseY - heart / 2f, heart, heart), HudIcon.Heart, healthColor);
+            HudDraw.Text(new Rect(bar.xMax + 10f * s, baseY - 18f * s, 70f * s, 36f * s), Mathf.CeilToInt(health).ToString(), 30f, HudDraw.Cream);
 
-            // Выносливость — тонкая линия под здоровьем, видна только пока тратится.
+            // Выносливость — штрих маркером над полосой, виден только пока тратится.
             if (staminaAlpha > 0.01f)
             {
                 var stamina = player.Stamina;
                 var color = stamina.IsExhausted ? Color.Lerp(StaminaColor, Alarm, HudDraw.Blink(8f)) : StaminaColor;
-                HudDraw.Bar(new Rect(x + 32f * s, healthY + 17f * s, 210f * s, 4f * s), stamina.Normalized, color, alpha: staminaAlpha);
+                HudDraw.InkLine(new Vector2(bar.x + 8f * s, bar.y - 12f * s), (bar.width - 16f * s) * stamina.Normalized, 5f * s, color, 120, staminaAlpha);
             }
 
-            // Доза — над фильтром, только когда растёт или уже срезала здоровье.
+            DrawFilter(new Vector2(x + 22f * s, baseY - 64f * s));
+
+            // Доза — значок выше, только когда растёт или уже срезала здоровье.
             if (doseAlpha > 0.01f)
             {
                 bool hot = dosimeter != null && dosimeter.Intensity > 0.01f;
-                var color = HudDraw.WithAlpha(hot ? Color.Lerp(RadiationColor, Color.white, 0.4f * HudDraw.Blink(10f)) : RadiationColor, doseAlpha);
-                float y = healthY - 66f * s;
-                HudDraw.Icon(new Rect(x, y - 1f * s, 22f * s, 22f * s), HudIcon.Radiation, color);
+                var center = new Vector2(x + 22f * s, baseY - 112f * s);
+                HudDraw.Badge(center, 20f, HudIcon.Radiation, RadiationColor, hot ? 140 + HudSketch.Boil : 140, doseAlpha);
                 string text = $"{survival.Dose.Value:0}";
                 if (hot)
-                    text += $"  +{dosimeter.Intensity:0.0}/с";
-                HudDraw.Text(new Rect(x + 32f * s, y - 4f * s, 200f * s, 28f * s), text, 16f, color);
+                    text += $"   +{dosimeter.Intensity:0.0} в сек.";
+                HudDraw.Text(new Rect(center.x + 30f * s, center.y - 18f * s, 260f * s, 36f * s), text, 26f,
+                    HudDraw.WithAlpha(hot ? RadiationColor : HudDraw.Cream, doseAlpha));
             }
 
             if (voice != null && voice.Current != Loudness.Quiet)
             {
                 bool shout = voice.Current == Loudness.Shout;
-                var color = shout ? Color.Lerp(Alarm, Color.white, 0.3f * HudDraw.Blink(10f)) : Amber;
-                HudDraw.Icon(new Rect(x + 252f * s, healthY - 33f * s, 20f * s, 20f * s), HudIcon.Microphone, color);
-                HudDraw.Text(new Rect(x + 276f * s, healthY - 37f * s, 80f * s, 26f * s), shout ? "20 м" : "8 м", 14f, color);
+                var center = new Vector2(bar.xMax - 14f * s, baseY - 64f * s);
+                HudDraw.Badge(center, 18f, HudIcon.Microphone, shout ? Alarm : Amber, shout ? 160 + HudSketch.Boil : 160);
+                HudDraw.Text(new Rect(center.x + 26f * s, center.y - 17f * s, 80f * s, 34f * s), shout ? "20 м!" : "8 м", 24f, shout ? Alarm : Amber);
             }
         }
 
-        private void DrawFilter(float x, float y)
+        private void DrawFilter(Vector2 center)
         {
             float s = HudDraw.Scale;
             bool swapping = survival.IsSwappingFilter.Value;
             float time = survival.FilterTime.Value;
             int seconds = Mathf.CeilToInt(time);
+            bool alarm = !survival.InSafeAir && !swapping && (time <= 0f || seconds <= 30);
 
-            string text;
-            Color color = HudDraw.Cream;
+            Color tint = survival.InSafeAir ? SafeAirColor : swapping ? Amber : alarm ? Alarm : FilterColor;
+            HudDraw.Badge(center, 20f, HudIcon.Filter, tint, alarm ? 130 + HudSketch.Boil : 130);
+            var textRect = new Rect(center.x + 30f * s, center.y - 18f * s, 240f * s, 36f * s);
+
             if (swapping)
-            {
-                text = "смена фильтра…";
-                color = Amber;
-            }
+                HudDraw.Text(textRect, "меняю фильтр…", 24f, Amber);
             else if (survival.InSafeAir)
-            {
-                text = "чистый воздух";
-                color = SafeAirColor;
-            }
+                HudDraw.Text(textRect, "чистый воздух", 24f, SafeAirColor);
             else if (time <= 0f)
             {
-                text = gear != null && gear.IndexOf(GearKind.Filter) >= 0 ? "нет фильтра — R" : "нет фильтра";
-                color = Color.Lerp(Alarm, Color.white, 0.35f * HudDraw.Blink(8f));
+                bool spare = gear != null && gear.IndexOf(GearKind.Filter) >= 0;
+                HudDraw.Stamp(new Vector2(center.x + 128f * s, center.y), "НЕТ ФИЛЬТРА", 18f, HudDraw.StampRed, -6f, 133 + HudSketch.Boil % 62);
+                if (spare)
+                    HudDraw.KeyHints(new Vector2(center.x + 286f * s, center.y), 21f, HudDraw.Cream, ("R", "сменить"));
             }
             else
             {
-                text = $"{seconds / 60}:{seconds % 60:00}";
-                if (seconds <= 30)
-                    color = Color.Lerp(Alarm, HudDraw.Cream, HudDraw.Blink(6f));
+                var color = seconds <= 30 ? Color.Lerp(Alarm, HudDraw.Cream, HudDraw.Blink(6f)) : HudDraw.Cream;
+                HudDraw.Text(textRect, $"{seconds / 60}:{seconds % 60:00}", 28f, color);
             }
-
-            HudDraw.Icon(new Rect(x, y - 1f * s, 22f * s, 22f * s), HudIcon.Filter, color);
-            HudDraw.Text(new Rect(x + 32f * s, y - 4f * s, 220f * s, 28f * s), text, 16f, color,
-                face: swapping || survival.InSafeAir || time <= 0f ? HudDraw.Face.Body : HudDraw.Face.Heading);
         }
 
         // ---------- Инвентарь ----------
@@ -308,54 +307,68 @@ namespace Nuclear.Player
                 return;
 
             float s = HudDraw.Scale;
-            const float size = 56f, gap = 8f;
-            float side = size * s;
-            float width = (size * PlayerGear.SlotCount + gap * (PlayerGear.SlotCount - 1)) * s;
-            float x0 = (Screen.width - width) / 2f;
-            float y = Screen.height - 36f * s - side;
+            const float radius = 30f, spacing = 80f;
+            float centerY = Screen.height - 62f * s;
+            float x0 = Screen.width / 2f - spacing * (PlayerGear.SlotCount - 1) / 2f * s;
 
             for (int i = 0; i < PlayerGear.SlotCount; i++)
             {
                 var slot = gear[i];
                 bool selected = gear.Selected == i;
-                var rect = new Rect(x0 + i * (size + gap) * s, y, side, side);
+                var center = new Vector2(x0 + i * spacing * s, centerY - (selected ? 6f * s : 0f));
+                float r = (selected ? radius * 1.18f : radius) * s;
+                bool lit = slot.Is(GearKind.Flashlight) && gear.LightSlot.Value == i;
 
-                HudDraw.Fill(rect, new Color(0f, 0f, 0f, selected ? 0.42f : 0.26f), 8f * s);
-                HudDraw.Frame(rect, HudDraw.WithAlpha(HudDraw.Cream, selected ? 0.9f : 0.22f), (selected ? 2f : 1.5f) * s, 8f * s);
-                HudDraw.Text(new Rect(rect.x + 5f * s, rect.y + 2f * s, 16f * s, 16f * s), (i + 1).ToString(), 10f,
-                    HudDraw.WithAlpha(HudDraw.Cream, selected ? 0.8f : 0.4f), TextAnchor.UpperLeft, outline: false);
+                if (lit)
+                    HudSketch.Fill(HudSketch.Circle(center, r + 9f * s, 200 + i, 2f * s), new Color(1f, 0.9f, 0.5f, 0.3f));
+                var circle = HudSketch.Circle(center, r, 210 + i * 13, 1.5f * s);
+                HudSketch.Fill(circle, HudDraw.WithAlpha(HudDraw.Paper, selected ? 1f : 0.72f));
+                HudSketch.Stroke(circle, (selected ? 4.5f : 3f) * s, HudDraw.WithAlpha(HudDraw.Ink, selected ? 1f : 0.8f), true, 210 + i * 13);
+
+                HudDraw.Text(new Rect(center.x - r - 6f * s, center.y - r - 12f * s, 30f * s, 30f * s), (i + 1).ToString(),
+                    selected ? 24f : 20f, HudDraw.WithAlpha(HudDraw.Cream, selected ? 1f : 0.75f), TextAnchor.MiddleCenter);
 
                 if (!slot.Filled)
                     continue;
-
-                bool lit = slot.Is(GearKind.Flashlight) && gear.LightSlot.Value == i;
-                float icon = side * 0.6f;
-                var tint = lit ? new Color(1f, 0.92f, 0.6f) : HudDraw.WithAlpha(HudDraw.Cream, selected ? 1f : 0.75f);
-                HudDraw.Icon(new Rect(rect.center.x - icon / 2f, rect.center.y - icon / 2f, icon, icon), IconOf(slot.Kind), tint);
+                float icon = r * 1.35f;
+                var tint = lit ? new Color(1f, 0.9f, 0.55f) : IconTint(slot.Kind);
+                HudDraw.Icon(new Rect(center.x - icon / 2f, center.y - icon / 2f, icon, icon), IconOf(slot.Kind), tint);
 
                 if (slot.Is(GearKind.Flashlight))
                 {
                     float charge = slot.Charge / gear.FlashlightDuration;
-                    var color = charge < 0.2f ? Color.Lerp(Amber, Alarm, HudDraw.Blink(6f)) : new Color(1f, 0.92f, 0.6f);
-                    HudDraw.Bar(new Rect(rect.x + 8f * s, rect.yMax - 8f * s, side - 16f * s, 3f * s), charge, color);
+                    var color = charge < 0.2f ? Color.Lerp(Amber, Alarm, HudDraw.Blink(6f)) : new Color(1f, 0.88f, 0.45f);
+                    HudDraw.InkLine(new Vector2(center.x - r * 0.7f, center.y + r + 9f * s), r * 1.4f * charge, 4f * s, color, 220 + i);
                 }
             }
 
-            // Название выбранного предмета и что с ним можно сделать — появляются при выборе и гаснут.
+            // Название выбранного предмета и что с ним делать — подписано от руки, появляется при выборе и гаснет.
             var selectedSlot = gear[gear.Selected];
             if (nameAlpha <= 0.01f || !selectedSlot.Filled)
                 return;
-            float centerX = Screen.width / 2f;
-            HudDraw.Text(new Rect(0f, y - 50f * s, Screen.width, 24f * s), GearPickup.NameOf(selectedSlot.Kind), 16f,
+            float top = centerY - radius * 1.18f * s - 6f * s;
+            HudDraw.Text(new Rect(0f, top - 78f * s, Screen.width, 38f * s), GearPickup.NameOf(selectedSlot.Kind), 30f,
                 HudDraw.WithAlpha(HudDraw.Cream, nameAlpha), TextAnchor.MiddleCenter);
             string use = gear.UseHint();
             var dim = HudDraw.WithAlpha(HudDraw.Dim, nameAlpha);
             string drop = selectedSlot.Kind == GearKind.Can ? "бросить" : "выбросить";
+            var hintCenter = new Vector2(Screen.width / 2f, top - 28f * s);
             if (use != null)
-                HudDraw.KeyHints(new Vector2(centerX, y - 16f * s), 13f, dim, ("ПКМ", use), ("Q", drop));
+                HudDraw.KeyHints(hintCenter, 20f, dim, ("ПКМ", use), ("Q", drop));
             else
-                HudDraw.KeyHints(new Vector2(centerX, y - 16f * s), 13f, dim, ("Q", drop));
+                HudDraw.KeyHints(hintCenter, 20f, dim, ("Q", drop));
         }
+
+        /// <summary>Цвет «краски» иконки на бумажном кружке — как раскрашенный рисунок в тетради.</summary>
+        private static Color IconTint(GearKind kind) => kind switch
+        {
+            GearKind.Bandage => new Color(0.97f, 0.94f, 0.88f),
+            GearKind.Flashlight => new Color(0.55f, 0.62f, 0.4f),
+            GearKind.Crowbar => new Color(0.82f, 0.3f, 0.24f),
+            GearKind.FlashlightBattery => new Color(0.95f, 0.72f, 0.3f),
+            GearKind.Filter => new Color(0.5f, 0.6f, 0.4f),
+            _ => new Color(0.75f, 0.42f, 0.3f),
+        };
 
         private static HudIcon IconOf(GearKind kind) => kind switch
         {
@@ -372,16 +385,16 @@ namespace Nuclear.Player
         private void DrawCenter()
         {
             float s = HudDraw.Scale;
-            var center = new Vector2(Screen.width / 2f, Screen.height / 2f + 40f * s);
+            var center = new Vector2(Screen.width / 2f, Screen.height / 2f + 50f * s);
 
             if (gear != null && gear.BandageProgress.Value > 0f)
             {
-                Progress(center, "Перевязка… не двигайтесь", gear.BandageProgress.Value, HudDraw.Cream);
+                Progress(center, "Перевязка… не двигайтесь", gear.BandageProgress.Value, HealthColor);
                 return;
             }
             if (pry != null && pry.LookHood is { } prying && prying.Progress.Value > 0f)
             {
-                Progress(center, prying.WithCrowbar.Value ? "Вскрываете ломом — это слышно" : "Вскрываете вдвоём…", prying.Progress.Value, Amber);
+                Progress(center, prying.WithCrowbar.Value ? "Вскрываете ломом — это слышно!" : "Вскрываете вдвоём…", prying.Progress.Value, Amber);
                 return;
             }
             if (carry == null)
@@ -397,9 +410,9 @@ namespace Nuclear.Player
                 parts = held.CanThrow ? new[] { ("E", "отпустить"), ("ЛКМ", "бросить") } : new[] { ("E", "отпустить") };
                 detail = $"{held.DisplayName}{ChargeText(held)}";
                 if (held.CarrierCount.Value > 1)
-                    detail += " · несёте вдвоём";
+                    detail += " — несёте вдвоём";
                 else if (!held.IsFull && carry.IsHeavyLoad)
-                    detail += " · тяжело, позови помощь";
+                    detail += " — тяжело, позови помощь";
             }
             else if (target != null)
             {
@@ -427,18 +440,16 @@ namespace Nuclear.Player
 
             if (parts == null)
                 return;
-            HudDraw.KeyHints(center, 16f, color, parts);
+            HudDraw.KeyHints(center, 24f, color, parts);
             if (detail != null)
-                HudDraw.Text(new Rect(0f, center.y + 14f * s, Screen.width, 22f * s), detail, 13f, HudDraw.Dim,
-                    TextAnchor.MiddleCenter, HudDraw.Face.Body);
+                HudDraw.Text(new Rect(0f, center.y + 18f * s, Screen.width, 30f * s), detail, 19f, HudDraw.Dim, TextAnchor.MiddleCenter);
         }
 
         private static void Progress(Vector2 center, string title, float progress, Color color)
         {
             float s = HudDraw.Scale;
-            HudDraw.Text(new Rect(0f, center.y - 12f * s, Screen.width, 24f * s), title, 15f, HudDraw.Cream,
-                TextAnchor.MiddleCenter, HudDraw.Face.Body);
-            HudDraw.Bar(new Rect(center.x - 100f * s, center.y + 16f * s, 200f * s, 5f * s), progress, color);
+            HudDraw.Text(new Rect(0f, center.y - 18f * s, Screen.width, 34f * s), title, 24f, HudDraw.Cream, TextAnchor.MiddleCenter);
+            HudDraw.Bar(new Rect(center.x - 120f * s, center.y + 18f * s, 240f * s, 18f * s), progress, color, 310);
         }
 
         private static string ChargeText(PhysicsItem item) =>
