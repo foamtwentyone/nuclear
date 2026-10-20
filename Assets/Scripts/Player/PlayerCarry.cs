@@ -150,6 +150,13 @@ namespace Nuclear.Player
                 return;
             }
 
+            // Снаряжение тоже уходит в карман, если там есть место.
+            if (item.TryGetComponent(out GearPickup gearPickup) && TryGetComponent(out PlayerGear gear) && gear.TryStash(gearPickup))
+            {
+                itemObject.Despawn();
+                return;
+            }
+
             if (item.TryAddCarrier(this))
                 heldItemId.Value = itemId;
         }

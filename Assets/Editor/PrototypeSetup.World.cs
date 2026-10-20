@@ -35,6 +35,14 @@ namespace Nuclear.EditorTools
         private static readonly Vector3[] CrateSpawns = { new(2f, 0.4f, 4f), new(3f, 0.4f, 4.5f), new(-3f, 0.4f, 3f) };
         private static readonly Vector3[] CanSpawns = { new(1f, 0.2f, 2f), new(1.4f, 0.2f, 2.3f), new(-1f, 0.2f, 2.5f), new(-1.5f, 0.2f, 1.8f), new(0f, 0.2f, 3f) };
         private static readonly Vector3[] FilterSpawns = { new(6f, 0.2f, 10f), new(-10f, 0.2f, 5f), new(10f, 0.2f, -2f), new(-4f, 0.2f, -12f), new(16f, 0.2f, 4f), new(14f, 0.2f, -14f) };
+        // Стартовое снаряжение на столе в шлюзе Бункера-7: на всех не хватит, придётся делить.
+        private static readonly Vector3[] TableBandages = { new(-3.45f, 0.86f, -2.1f), new(-3.25f, 0.86f, -2.2f) };
+        private static readonly Vector3[] TableFlashlights = { new(-2.85f, 0.86f, -1.85f), new(-2.6f, 0.86f, -1.9f) };
+        private static readonly Vector3[] TableCrowbar = { new(-3f, 0.84f, -2.28f) };
+        private static readonly Vector3[] TableBatteries = { new(-2.45f, 0.84f, -2.25f), new(-2.38f, 0.84f, -2.15f) };
+        // По дороге: ещё бинты и батарейки в случайных местах.
+        private static readonly Vector3[] BandageSpawns = { new(7f, 0.2f, 9f), new(-9f, 0.2f, 6f), new(11f, 0.2f, -3f), new(-6f, 0.2f, 14f) };
+        private static readonly Vector3[] FlashlightBatterySpawns = { new(5.5f, 0.2f, 13.5f), new(-11f, 0.2f, 3f), new(7f, 0.2f, -10.5f), new(15f, 0.2f, 6f) };
         private static readonly Vector3[] BlindOneSpawns = { new(-8f, 0f, 20f), new(-18f, 0f, 16f), new(20f, 0f, 14f) };
 
         /// <summary>Занятые места: прямоугольники построек и круги вокруг важных точек.</summary>
@@ -68,7 +76,8 @@ namespace Nuclear.EditorTools
             manager.NetworkConfig.NetworkTransport = transport;
             manager.NetworkConfig.PlayerPrefab = playerPrefab;
             manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
-            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter, items.BlindOne, items.Door));
+            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter, items.BlindOne, items.Door,
+                items.Gear.Bandage, items.Gear.Flashlight, items.Gear.Crowbar, items.Gear.Battery));
             networkObject.AddComponent<ConnectionMenu>();
 
             BuildSpawner(items);
@@ -102,6 +111,12 @@ namespace Nuclear.EditorTools
                 // Слепыш начинает в дальней части карты, подальше от шлюза.
                 new ItemSpawner.Entry { prefab = items.BlindOne, positions = BlindOneSpawns, count = 1 },
                 new ItemSpawner.Entry { prefab = items.Door, positions = new[] { DoorPosition }, count = 1, randomYaw = false },
+                new ItemSpawner.Entry { prefab = items.Gear.Bandage, positions = TableBandages, count = TableBandages.Length },
+                new ItemSpawner.Entry { prefab = items.Gear.Flashlight, positions = TableFlashlights, count = TableFlashlights.Length },
+                new ItemSpawner.Entry { prefab = items.Gear.Crowbar, positions = TableCrowbar, count = 1, randomYaw = false },
+                new ItemSpawner.Entry { prefab = items.Gear.Battery, positions = TableBatteries, count = TableBatteries.Length },
+                new ItemSpawner.Entry { prefab = items.Gear.Bandage, positions = BandageSpawns, count = 2 },
+                new ItemSpawner.Entry { prefab = items.Gear.Battery, positions = FlashlightBatterySpawns, count = 2 },
             });
         }
 
@@ -142,7 +157,7 @@ namespace Nuclear.EditorTools
         {
             blockedRects.Clear();
             blockedCircles.Clear();
-            foreach (var spawns in new[] { BatterySpawns, CrateSpawns, CanSpawns, FilterSpawns, BlindOneSpawns })
+            foreach (var spawns in new[] { BatterySpawns, CrateSpawns, CanSpawns, FilterSpawns, BandageSpawns, FlashlightBatterySpawns, BlindOneSpawns })
             {
                 foreach (var point in spawns)
                     blockedCircles.Add(new Vector3(point.x, point.z, 1.8f));
@@ -857,7 +872,7 @@ namespace Nuclear.EditorTools
 
         private static bool IsNearSpawn(Vector2 point, float margin)
         {
-            foreach (var spawns in new[] { BatterySpawns, FilterSpawns, BlindOneSpawns })
+            foreach (var spawns in new[] { BatterySpawns, FilterSpawns, BandageSpawns, FlashlightBatterySpawns, BlindOneSpawns })
             {
                 foreach (var spawn in spawns)
                 {

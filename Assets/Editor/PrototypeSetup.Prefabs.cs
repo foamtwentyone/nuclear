@@ -16,7 +16,7 @@ namespace Nuclear.EditorTools
     /// <summary>Префабы: игрок, предметы, Слепыш, дверь бункера.</summary>
     public static partial class PrototypeSetup
     {
-        private static GameObject BuildPlayerPrefab()
+        private static GameObject BuildPlayerPrefab(GearPrefabs gear)
         {
             var root = new GameObject("Player");
 
@@ -45,6 +45,13 @@ namespace Nuclear.EditorTools
             root.AddComponent<PlayerAudio>();
             root.AddComponent<ScreenEffects>();
             root.AddComponent<PlayerGhost>();
+            Configure(root.AddComponent<PlayerGear>(), new Dictionary<string, object>
+            {
+                ["bandagePrefab"] = gear.Bandage,
+                ["flashlightPrefab"] = gear.Flashlight,
+                ["crowbarPrefab"] = gear.Crowbar,
+                ["batteryPrefab"] = gear.Battery,
+            });
             root.AddComponent<PlayerHud>();
 
             // Тело с опорной точкой в тазу: так его удобно уронить при смерти (см. PlayerSurvival).
@@ -76,6 +83,19 @@ namespace Nuclear.EditorTools
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = FogColor;
             cameraObject.AddComponent<AudioListener>();
+
+            // Фонарь светит из головы туда, куда смотрит игрок (включает PlayerGear).
+            var flashlight = new GameObject("Flashlight").AddComponent<Light>();
+            flashlight.transform.SetParent(cameraObject.transform, false);
+            flashlight.transform.localPosition = new Vector3(0.15f, -0.15f, 0.1f);
+            flashlight.type = LightType.Spot;
+            flashlight.spotAngle = 55f;
+            flashlight.innerSpotAngle = 25f;
+            flashlight.range = 22f;
+            flashlight.intensity = 3f;
+            flashlight.color = new Color(1f, 0.93f, 0.78f);
+            flashlight.shadows = LightShadows.Soft;
+            flashlight.enabled = false;
             ConfigureCameraForPipeline(camera);
 
             AddAsh(root.transform);
@@ -204,6 +224,29 @@ namespace Nuclear.EditorTools
             });
 
             return SavePrefab(root, "Can");
+        }
+
+        /// <summary>Снаряжение для кармана: маленький физический предмет с GearPickup.</summary>
+        private static GameObject BuildGearPrefab(string name, string displayName, GearKind kind, System.Action<MeshKit> model, Vector3 colliderSize, float mass)
+        {
+            var root = CreateItemRoot(name, mass, continuous: true);
+            var kit = new MeshKit();
+            model(kit);
+            AddModel(root.transform, name, kit, Vector3.zero, Quaternion.identity)
+                .AddComponent<BoxCollider>().size = colliderSize;
+
+            var item = root.AddComponent<PhysicsItem>();
+            Configure(item, new Dictionary<string, object>
+            {
+                ["displayName"] = displayName,
+                ["holdDistance"] = 1f,
+                ["throwImpulse"] = kind == GearKind.Crowbar ? 6f : 3f,
+                ["impactSound"] = kind == GearKind.Crowbar ? PhysicsItem.ImpactSound.Heavy : PhysicsItem.ImpactSound.Tin,
+                ["impactNoiseRadius"] = kind == GearKind.Crowbar ? 12f : 6f,
+            });
+            Configure(root.AddComponent<GearPickup>(), new Dictionary<string, object> { ["kind"] = kind });
+
+            return SavePrefab(root, name);
         }
 
         private static GameObject BuildFilterPrefab()

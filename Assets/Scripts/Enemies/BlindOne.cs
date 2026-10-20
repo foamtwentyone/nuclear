@@ -22,6 +22,7 @@ namespace Nuclear.Enemies
             Investigate,
             Rush,
             Listen,
+            Stunned,
         }
 
         [Header("Скорость")]
@@ -147,12 +148,38 @@ namespace Nuclear.Enemies
                     if (Time.time >= waitUntil)
                         EnterWander();
                     break;
+
+                case State.Stunned:
+                    // Очухался — замирает и слушает, кто его ударил.
+                    if (Time.time >= waitUntil)
+                    {
+                        agent.isStopped = false;
+                        Set(State.Listen);
+                        waitUntil = Time.time + listenTime;
+                    }
+                    break;
             }
         }
 
+        /// <summary>Сервер: удар ломом оглушает на несколько секунд. Убить Слепыша нельзя.</summary>
+        public void Stun(float seconds)
+        {
+            if (!IsServer || agent == null)
+                return;
+            if (agent.isOnNavMesh)
+            {
+                agent.ResetPath();
+                agent.isStopped = true;
+            }
+            waitUntil = Time.time + seconds;
+            Set(State.Stunned);
+        }
+
+        public Vector3 BodyCenter => transform.position + Vector3.up * 0.9f;
+
         private void OnNoise(Vector3 position, float radius)
         {
-            if (!agent.isOnNavMesh)
+            if (!agent.isOnNavMesh || CurrentState.Value == State.Stunned)
                 return;
 
             if (IsBehindWall(position))
@@ -293,6 +320,12 @@ namespace Nuclear.Enemies
                 voice.pitch = Random.Range(0.95f, 1.05f);
                 voice.PlayOneShot(ProceduralAudio.Scream);
             }
+            else if (current == State.Stunned)
+            {
+                // Оглушённый визжит тонко и коротко.
+                voice.pitch = 1.35f;
+                voice.PlayOneShot(ProceduralAudio.Scream, 0.7f);
+            }
             else if (current == State.Listen && previous == State.Rush)
             {
                 // Добежал и никого не нашёл — злобно стучит зубами.
@@ -324,6 +357,7 @@ namespace Nuclear.Enemies
                 State.Investigate => new Color(1f, 0.9f, 0.55f),
                 State.Rush => new Color(1f, 0.5f, 0.45f),
                 State.Listen => new Color(0.7f, 0.82f, 1f),
+                State.Stunned => new Color(0.85f, 0.7f, 1f),
                 _ => Color.white,
             };
             bodyRenderer.GetPropertyBlock(tintBlock);

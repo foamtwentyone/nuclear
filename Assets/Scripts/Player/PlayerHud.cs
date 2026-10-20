@@ -21,10 +21,12 @@ namespace Nuclear.Player
         private Dosimeter dosimeter;
         private PlayerVoice voice;
         private PlayerGhost ghost;
+        private PlayerGear gear;
         private GUIStyle hintStyle;
         private GUIStyle statusStyle;
         private GUIStyle deathStyle;
         private GUIStyle bannerStyle;
+        private GUIStyle gearStyle;
 
         private void Awake()
         {
@@ -34,6 +36,7 @@ namespace Nuclear.Player
             dosimeter = GetComponent<Dosimeter>();
             voice = GetComponent<PlayerVoice>();
             ghost = GetComponent<PlayerGhost>();
+            gear = GetComponent<PlayerGear>();
         }
 
         private void OnGUI()
@@ -59,6 +62,7 @@ namespace Nuclear.Player
             DrawCrosshair();
             DrawBars();
             DrawStatus();
+            DrawGear();
             DrawHint();
         }
 
@@ -193,6 +197,50 @@ namespace Nuclear.Player
             GUI.Label(new Rect(16f, Screen.height - 116f, 420f, 100f), $"{air}\n{spare}\n{dose}{voiceLine}", statusStyle);
         }
 
+        /// <summary>Карман снаряжения справа внизу: выбранный предмет подсвечен, под ним — что делает ПКМ.</summary>
+        private void DrawGear()
+        {
+            if (gear == null)
+                return;
+
+            string Slot(PlayerGear.Slot slot, string key, string text, bool has)
+            {
+                string color = !has ? "#6b6b60" : gear.Selected == slot ? "#ffe680" : "#d9d9bf";
+                string mark = gear.Selected == slot ? "> " : "  ";
+                return $"<color={color}>{mark}[{key}] {text}</color>";
+            }
+
+            int seconds = Mathf.CeilToInt(gear.FlashlightCharge.Value);
+            string light = gear.HasFlashlight.Value
+                ? $"Фонарь {seconds / 60}:{seconds % 60:00}{(gear.FlashlightOn.Value ? " ВКЛ" : "")}"
+                : "Фонарь —";
+            if (gear.SpareBatteries.Value > 0)
+                light += $" +{gear.SpareBatteries.Value} бат.";
+
+            string text = Slot(PlayerGear.Slot.Bandage, "1", gear.Bandages.Value > 0 ? "Бинт" : "Бинт —", gear.Bandages.Value > 0) + "\n"
+                + Slot(PlayerGear.Slot.Flashlight, "2", light, gear.HasFlashlight.Value) + "\n"
+                + Slot(PlayerGear.Slot.Crowbar, "3", gear.HasCrowbar.Value ? "Лом" : "Лом —", gear.HasCrowbar.Value);
+
+            string action = gear.Selected switch
+            {
+                PlayerGear.Slot.Bandage when gear.Bandages.Value > 0 => gear.LookingAtTeammate ? "ПКМ — перевязать товарища" : "ПКМ — перевязать себя",
+                PlayerGear.Slot.Flashlight when gear.HasFlashlight.Value => "ПКМ или F — фонарь",
+                PlayerGear.Slot.Crowbar when gear.HasCrowbar.Value => "ПКМ — ударить Слепыша (оглушит, лом сломается)",
+                _ => null,
+            };
+            if (action != null)
+                text += $"\n<size=13>{action}</size>";
+
+            gearStyle ??= new GUIStyle(statusStyle) { alignment = TextAnchor.LowerRight };
+            GUI.Label(new Rect(Screen.width - 436f, Screen.height - 116f, 420f, 100f), text, gearStyle);
+
+            if (gear.BandageProgress.Value > 0f)
+            {
+                GUI.Label(new Rect(0f, Screen.height / 2f + 60f, Screen.width, 30f), "Перевязка… не двигайтесь", hintStyle);
+                DrawBar(Screen.height / 2f + 90f, gear.BandageProgress.Value, 1f, new Color(0.9f, 0.9f, 0.8f));
+            }
+        }
+
         private void DrawHint()
         {
             if (carry == null)
@@ -216,6 +264,8 @@ namespace Nuclear.Player
                 if (target.IsFull)
                     hint = $"{target.DisplayName}{ChargeText(target)}: уже несут";
                 else if (target.TryGetComponent(out FilterPickup _) && survival != null && survival.HasPocketSpace)
+                    hint = $"E — в карман: {target.DisplayName}";
+                else if (target.TryGetComponent(out GearPickup gearPickup) && gear != null && gear.HasSpaceFor(gearPickup.Kind))
                     hint = $"E — в карман: {target.DisplayName}";
                 else
                     hint = $"E — взять: {target.DisplayName}{ChargeText(target)}";

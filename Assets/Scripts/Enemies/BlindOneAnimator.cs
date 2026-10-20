@@ -83,6 +83,8 @@ namespace Nuclear.Enemies
                 // Перед броском — резкий присед, после броска — тяжёлое оседание.
                 if (state == BlindOne.State.Rush)
                     stretchVelocity -= 3.2f;
+                else if (state == BlindOne.State.Stunned)
+                    stretchVelocity -= 4f;
                 else if (lastState == BlindOne.State.Rush)
                     stretchVelocity -= 1.6f;
                 lastState = state;
@@ -158,6 +160,12 @@ namespace Nuclear.Enemies
                     targetYaw = Mathf.Sin(t * 3f) * 5f;
                     targetPitch = 12f;
                     sniffRate = 16f;
+                    break;
+                case BlindOne.State.Stunned:
+                    // Оглушён: нос обвис и мотается.
+                    targetYaw = Mathf.Sin(t * 5f) * 18f;
+                    targetPitch = 28f;
+                    sniffRate = 1f;
                     break;
                 case BlindOne.State.Listen:
                 case BlindOne.State.Investigate:

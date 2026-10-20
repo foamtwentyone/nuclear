@@ -207,6 +207,45 @@ namespace Nuclear.EditorTools.LowPoly
             k.Cylinder(new Vector3(0f, 0.04f, 0f), Quaternion.identity, 0.028f, 0.028f, 0.03f, 8, Swatch.Brass, Swatch.Brass);
         }
 
+        /// <summary>Скатка бинта с красным крестом на обёртке, лежит на боку; центр в начале координат.</summary>
+        public static void Bandage(MeshKit k)
+        {
+            var side = Quaternion.Euler(0f, 0f, 90f);
+            k.Cylinder(new Vector3(0.045f, 0f, 0f), side, 0.04f, 0.04f, 0.09f, 12, Swatch.White, Swatch.LabelPaper);
+            k.Cylinder(new Vector3(0.047f, 0f, 0f), side, 0.012f, 0.012f, 0.094f, 8, Swatch.LabelPaper, Swatch.LabelPaper);
+            k.Box(new Vector3(0f, 0.041f, 0f), new Vector3(0.05f, 0.004f, 0.016f), Swatch.SignalRed);
+            k.Box(new Vector3(0f, 0.041f, 0f), new Vector3(0.016f, 0.004f, 0.05f), Swatch.SignalRed);
+        }
+
+        /// <summary>Армейский фонарь: корпус, расширенная головка со стеклом и кнопка; светит вдоль +Z.</summary>
+        public static void Flashlight(MeshKit k)
+        {
+            var forward = Quaternion.Euler(90f, 0f, 0f);
+            k.Cylinder(new Vector3(0f, 0f, -0.1f), forward, 0.022f, 0.022f, 0.15f, 10, Swatch.FilterOliveDark, Swatch.MetalDark);
+            k.Cylinder(new Vector3(0f, 0f, 0.05f), forward, 0.024f, 0.036f, 0.045f, 10, Swatch.FilterOlive, Swatch.FilterOlive);
+            k.Cylinder(new Vector3(0f, 0f, 0.094f), forward, 0.03f, 0.03f, 0.004f, 10, Swatch.Lens, Swatch.Lens);
+            k.Box(new Vector3(0f, 0.024f, -0.02f), new Vector3(0.012f, 0.008f, 0.022f), Swatch.Rubber);
+            k.Cylinder(new Vector3(0f, 0f, -0.104f), forward, 0.018f, 0.018f, 0.006f, 8, Swatch.Metal, Swatch.Metal);
+        }
+
+        /// <summary>Красный лом с загнутым гвоздодёром на одном конце и лопаткой на другом; лежит вдоль X.</summary>
+        public static void Crowbar(MeshKit k)
+        {
+            k.Box(new Vector3(-0.03f, 0f, 0f), new Vector3(0.62f, 0.024f, 0.024f), Swatch.PaintRed);
+            k.Box(new Vector3(0.31f, 0.03f, 0f), new Vector3(0.1f, 0.022f, 0.024f), Quaternion.Euler(0f, 0f, 55f), Swatch.PaintRed);
+            k.Box(new Vector3(0.34f, 0.085f, 0f), new Vector3(0.06f, 0.016f, 0.03f), Quaternion.Euler(0f, 0f, 120f), Swatch.Metal);
+            k.Box(new Vector3(-0.37f, 0.006f, 0f), new Vector3(0.08f, 0.01f, 0.034f), Quaternion.Euler(0f, 0f, -10f), Swatch.Metal);
+        }
+
+        /// <summary>Батарейка для фонаря; центр в начале координат.</summary>
+        public static void FlashlightBattery(MeshKit k)
+        {
+            var side = Quaternion.Euler(0f, 0f, 90f);
+            k.Cylinder(new Vector3(0.03f, 0f, 0f), side, 0.016f, 0.016f, 0.06f, 10, Swatch.BatteryCase, Swatch.Metal);
+            k.Cylinder(new Vector3(0.012f, 0f, 0f), side, 0.0165f, 0.0165f, 0.02f, 10, Swatch.Copper, Swatch.Metal);
+            k.Cylinder(new Vector3(-0.03f, 0f, 0f), side, 0.006f, 0.006f, 0.005f, 6, Swatch.Metal, Swatch.Metal);
+        }
+
         // ---------- Дверь бункера ----------
 
         /// <summary>Гермостворка 3×2.6 с рёбрами жёсткости и предупреждающей полосой; центр в начале координат.</summary>

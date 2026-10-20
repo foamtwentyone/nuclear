@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Nuclear.EditorTools.LowPoly;
+using Nuclear.Items;
 using Unity.Netcode;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -54,9 +55,17 @@ namespace Nuclear.EditorTools
 
             CreateSharedMaterials();
 
-            var playerPrefab = BuildPlayerPrefab();
+            var gear = new GearPrefabs
+            {
+                Bandage = BuildGearPrefab("Bandage", "Бинт", GearKind.Bandage, Models.Bandage, new Vector3(0.09f, 0.08f, 0.08f), 0.1f),
+                Flashlight = BuildGearPrefab("Flashlight", "Фонарь", GearKind.Flashlight, Models.Flashlight, new Vector3(0.07f, 0.07f, 0.2f), 0.4f),
+                Crowbar = BuildGearPrefab("Crowbar", "Лом", GearKind.Crowbar, Models.Crowbar, new Vector3(0.8f, 0.1f, 0.04f), 1.5f),
+                Battery = BuildGearPrefab("Flashlight Battery", "Батарейка", GearKind.FlashlightBattery, Models.FlashlightBattery, new Vector3(0.065f, 0.034f, 0.034f), 0.05f),
+            };
+            var playerPrefab = BuildPlayerPrefab(gear);
             var items = new ItemPrefabs
             {
+                Gear = gear,
                 Battery = BuildBatteryPrefab(),
                 Crate = BuildCratePrefab(),
                 Can = BuildCanPrefab(),
@@ -78,6 +87,15 @@ namespace Nuclear.EditorTools
             public GameObject Filter;
             public GameObject BlindOne;
             public GameObject Door;
+            public GearPrefabs Gear;
+        }
+
+        private struct GearPrefabs
+        {
+            public GameObject Bandage;
+            public GameObject Flashlight;
+            public GameObject Crowbar;
+            public GameObject Battery;
         }
 
         // ---------- Материалы ----------
@@ -350,6 +368,7 @@ namespace Nuclear.EditorTools
                     case bool b: property.boolValue = b; break;
                     case string text: property.stringValue = text; break;
                     case Enum e: property.enumValueIndex = Convert.ToInt32(e); break;
+                    case Object reference: property.objectReferenceValue = reference; break;
                 }
             }
             serialized.ApplyModifiedPropertiesWithoutUndo();

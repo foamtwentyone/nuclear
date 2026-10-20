@@ -88,6 +88,15 @@ namespace Nuclear.Player
             return true;
         }
 
+        /// <summary>Сервер: лечит, но не выше максимума, срезанного радиацией. Мёртвых не поднимает.</summary>
+        public void Heal(float amount)
+        {
+            if (IsDead)
+                return;
+
+            Health.Value = Mathf.Min(MaxHealth, Health.Value + amount);
+        }
+
         /// <summary>Сервер: отнимает здоровье. При нуле игрок погибает.</summary>
         public void TakeDamage(float amount)
         {
