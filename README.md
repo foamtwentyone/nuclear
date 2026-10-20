@@ -3,7 +3,7 @@
 Кооперативная игра на 2–4 игроков про переход между бункерами после ядерной войны. Дизайн: [GAME_DESIGN.md](GAME_DESIGN.md).
 
 ## Запуск прототипа
-1. Unity Hub → **Add project from disk** → папка репозитория. Версия: Unity 6 (6000.0 LTS или новее).
+1. Unity Hub → **Add project from disk** → папка репозитория. Версия: Unity 6.6 или новее (пакеты в `Packages/manifest.json` подобраны под неё).
 2. При первом открытии Unity предложит включить новую систему ввода (Input System) и перезапуститься — соглашайся.
 3. Меню **Nuclear → Собрать сцену прототипа**. Создадутся `Assets/Prefabs/Player.prefab` и `Assets/Scenes/Prototype.unity`.
 4. Play → **Создать игру (хост)**.
