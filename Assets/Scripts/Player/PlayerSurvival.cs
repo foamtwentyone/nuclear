@@ -57,12 +57,7 @@ namespace Nuclear.Player
         {
             carry = GetComponent<PlayerCarry>();
 
-            voice = gameObject.AddComponent<AudioSource>();
-            voice.spatialBlend = 1f;
-            voice.rolloffMode = AudioRolloffMode.Linear;
-            voice.minDistance = 1f;
-            voice.maxDistance = 25f;
-            voice.playOnAwake = false;
+            voice = SoundSources.Create3D(gameObject, maxDistance: 25f);
         }
 
         public override void OnNetworkSpawn()

@@ -15,7 +15,7 @@ namespace Nuclear.Player
         [Tooltip("Дополнительных щелчков в секунду на единицу фона.")]
         [SerializeField] private float ratePerIntensity = 10f;
         [SerializeField] private float maxRate = 60f;
-        [SerializeField, Range(0f, 1f)] private float volume = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float volume = 0.35f;
 
         /// <summary>Текущий фон в точке игрока, доза в секунду.</summary>
         public float Intensity { get; private set; }
@@ -26,9 +26,7 @@ namespace Nuclear.Player
         private void Awake()
         {
             player = GetComponent<PlayerController>();
-            source = gameObject.AddComponent<AudioSource>();
-            source.spatialBlend = 0f;
-            source.playOnAwake = false;
+            source = SoundSources.Create2D(gameObject);
         }
 
         private void Update()

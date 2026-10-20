@@ -162,6 +162,46 @@ namespace Nuclear.EditorTools.LowPoly
             Pop();
         }
 
+        /// <summary>
+        /// Эллипсоид с полюсами по локальной Y: rings поясов от низа к верху, sides сегментов по кругу.
+        /// Цвет каждой грани — случайный из swatches (повторы в массиве задают вес), что даёт пятнистую шерсть.
+        /// jitter (доля радиуса) делает форму бугристой; полюса не сдвигаются, чтобы не рвать сетку.
+        /// </summary>
+        public void Ellipsoid(Vector3 center, Quaternion rotation, Vector3 radii, int rings, int sides, Swatch[] swatches, System.Random random, float jitter = 0f)
+        {
+            var points = new Vector3[rings + 1, sides];
+            for (int r = 0; r <= rings; r++)
+            {
+                float latitude = Mathf.PI * r / rings;
+                float y = -Mathf.Cos(latitude);
+                float ring = Mathf.Sin(latitude);
+                for (int s = 0; s < sides; s++)
+                {
+                    float angle = 2f * Mathf.PI * s / sides;
+                    float bump = r == 0 || r == rings ? 1f : 1f + Range(random, -jitter, jitter);
+                    points[r, s] = Vector3.Scale(new Vector3(Mathf.Cos(angle) * ring, y, Mathf.Sin(angle) * ring) * bump, radii);
+                }
+            }
+
+            Push(center, rotation);
+            for (int r = 0; r < rings; r++)
+            {
+                for (int s = 0; s < sides; s++)
+                {
+                    int next = (s + 1) % sides;
+                    var swatch = swatches[random.Next(swatches.Length)];
+                    // У полюсов четырёхугольник вырождается в треугольник: рисуем только непустой.
+                    if (r == 0)
+                        Triangle(points[0, s], points[1, s], points[1, next], swatch);
+                    else if (r == rings - 1)
+                        Triangle(points[r, s], points[rings, s], points[r, next], swatch);
+                    else
+                        Quad(points[r, s], points[r + 1, s], points[r + 1, next], points[r, next], swatch);
+                }
+            }
+            Pop();
+        }
+
         /// <summary>Цилиндр между двумя точками — для веток, арматуры, проводов, конечностей.</summary>
         public void Limb(Vector3 from, Vector3 to, float radius, float topRadius, int sides, Swatch swatch)
         {

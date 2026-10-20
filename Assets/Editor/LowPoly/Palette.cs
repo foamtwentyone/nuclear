@@ -22,8 +22,9 @@ namespace Nuclear.EditorTools.LowPoly
         Jacket, JacketDark, Trousers, Canvas, Rubber, Lens, Boots,
         // Предметы
         FilterOlive, FilterOliveDark, Brass, Copper, Lead, BatteryCase, LabelPaper, CanLabel,
-        // Слепыш
+        // Слепыш: облезлая шерсть морской свинки, голая кожа, звёздчатый нос, резцы
         Skin, SkinDark, SkinPale, Mouth, Claw,
+        Fur, FurDark, FurPale, NosePink, NoseDark, Teeth,
     }
 
     /// <summary>
@@ -55,6 +56,7 @@ namespace Nuclear.EditorTools.LowPoly
             Hex(0x5b6340), Hex(0x434a2f), Hex(0xa88a46), Hex(0xa0603a), Hex(0x55575a), Hex(0x2d3238), Hex(0xc8bfa4), Hex(0x9a4a35),
             // Слепыш
             Hex(0xb8a89c), Hex(0x8c7a70), Hex(0xd6c9bd), Hex(0x3a1f1e), Hex(0x2e2a26),
+            Hex(0x7a6450), Hex(0x47382c), Hex(0xb3a185), Hex(0xc98a86), Hex(0x8c5556), Hex(0xd9c58f),
         };
 
         public static int Count => Colors.Length;

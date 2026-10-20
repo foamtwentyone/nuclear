@@ -5,18 +5,20 @@ using static Nuclear.Audio.Dsp;
 namespace Nuclear.Audio
 {
     /// <summary>
-    /// Все звуки игры, собранные в коде из шума, тонов и фильтров. Временная замена записям:
-    /// каждый клип строится один раз при первом обращении и дальше берётся из кэша.
+    /// Все звуки игры, синтезированные в коде. Временная замена записям, но со звуковым дизайном:
+    /// розовый шум вместо белого, хруст из «зёрен», удары из собственных частот материала,
+    /// голоса через форманты, немного реверберации для пространства.
+    /// Каждый клип строится один раз при первом обращении и дальше берётся из кэша.
     /// </summary>
     public static class ProceduralAudio
     {
-        public const int FootstepVariants = 4;
+        public const int FootstepVariants = 6;
 
         private static AudioClip click, cough, maskBreath, heartbeat, land, pickup, filterRemove, filterAttach;
-        private static AudioClip impactWood, impactMetal, impactTin, sparks;
+        private static AudioClip impactWood, impactHeavy, impactTin, sparks;
         private static AudioClip wind, distantCreak, distantHowl;
         private static AudioClip rumble, doorAlarm, doorClunk;
-        private static AudioClip blindBreath, scream, swipe, hitFlesh, echoClick;
+        private static AudioClip blindPurr, sniff, scream, bite, chatter, hitFlesh, heavyStep;
         private static AudioClip victory, defeat;
         private static readonly AudioClip[] footsteps = new AudioClip[FootstepVariants];
 
@@ -25,7 +27,7 @@ namespace Nuclear.Audio
         public static AudioClip Cough => Cached(ref cough, MakeCough);
         public static AudioClip MaskBreath => Cached(ref maskBreath, MakeMaskBreath);
         public static AudioClip Heartbeat => Cached(ref heartbeat, MakeHeartbeat);
-        public static AudioClip Land => Cached(ref land, () => MakeStep("Land", 7, 1.6f));
+        public static AudioClip Land => Cached(ref land, () => MakeStep("Land", 77, grains: 60, spread: 0.15f, heel: 0.06f, gain: 1.3f));
         public static AudioClip Pickup => Cached(ref pickup, MakePickup);
         public static AudioClip FilterRemove => Cached(ref filterRemove, MakeFilterRemove);
         public static AudioClip FilterAttach => Cached(ref filterAttach, MakeFilterAttach);
@@ -33,15 +35,13 @@ namespace Nuclear.Audio
         public static AudioClip Footstep(int variant)
         {
             int index = Mathf.Abs(variant) % FootstepVariants;
-            return Cached(ref footsteps[index], () => MakeStep($"Footstep {index}", 100 + index, 1f));
+            return Cached(ref footsteps[index], () => MakeStep($"Footstep {index}", 100 + index, grains: 32, spread: 0.09f, heel: 0.025f, gain: 1f));
         }
 
         // Предметы
         public static AudioClip ImpactWood => Cached(ref impactWood, MakeImpactWood);
-        public static AudioClip ImpactMetal => Cached(ref impactMetal, () => MakeMetal("Impact Metal", 1.2f,
-            new[] { 173f, 409f, 761f, 1187f, 1733f }, new[] { 1f, 0.7f, 0.5f, 0.35f, 0.2f }, new[] { 0.5f, 0.35f, 0.25f, 0.18f, 0.12f }));
-        public static AudioClip ImpactTin => Cached(ref impactTin, () => MakeMetal("Impact Tin", 0.5f,
-            new[] { 903f, 2141f, 3389f, 5011f, 6870f }, new[] { 1f, 0.6f, 0.45f, 0.3f, 0.2f }, new[] { 0.25f, 0.18f, 0.12f, 0.08f, 0.05f }));
+        public static AudioClip ImpactHeavy => Cached(ref impactHeavy, MakeImpactHeavy);
+        public static AudioClip ImpactTin => Cached(ref impactTin, MakeImpactTin);
         public static AudioClip Sparks => Cached(ref sparks, MakeSparks);
 
         // Мир
@@ -52,19 +52,20 @@ namespace Nuclear.Audio
         // Дверь бункера
         public static AudioClip Rumble => Cached(ref rumble, MakeRumble);
         public static AudioClip DoorAlarm => Cached(ref doorAlarm, MakeDoorAlarm);
-        public static AudioClip DoorClunk => Cached(ref doorClunk, () => MakeMetal("Door Clunk", 1.5f,
-            new[] { 61f, 97f, 213f, 397f, 611f }, new[] { 1f, 0.8f, 0.5f, 0.3f, 0.2f }, new[] { 0.6f, 0.5f, 0.35f, 0.25f, 0.15f }));
+        public static AudioClip DoorClunk => Cached(ref doorClunk, MakeDoorClunk);
 
-        // Слепыш
-        public static AudioClip BlindBreath => Cached(ref blindBreath, MakeBlindBreath);
+        // Слепыш — гигантская морская свинка
+        public static AudioClip BlindPurr => Cached(ref blindPurr, MakeBlindPurr);
+        public static AudioClip Sniff => Cached(ref sniff, MakeSniff);
         public static AudioClip Scream => Cached(ref scream, MakeScream);
-        public static AudioClip Swipe => Cached(ref swipe, MakeSwipe);
+        public static AudioClip Bite => Cached(ref bite, MakeBite);
+        public static AudioClip Chatter => Cached(ref chatter, MakeChatter);
         public static AudioClip HitFlesh => Cached(ref hitFlesh, MakeHitFlesh);
-        public static AudioClip EchoClick => Cached(ref echoClick, MakeEchoClick);
+        public static AudioClip HeavyStep => Cached(ref heavyStep, MakeHeavyStep);
 
         // Итог уровня
-        public static AudioClip Victory => Cached(ref victory, () => MakeChord("Victory", new[] { 220f, 277.18f, 329.63f, 440f, 554.37f }, 0.9f));
-        public static AudioClip Defeat => Cached(ref defeat, () => MakeChord("Defeat", new[] { 55f, 110f, 130.81f, 164.81f, 196f }, 0.97f));
+        public static AudioClip Victory => Cached(ref victory, () => MakePad("Victory", new[] { 220f, 277.18f, 329.63f, 493.88f, 659.25f }, opening: true));
+        public static AudioClip Defeat => Cached(ref defeat, () => MakePad("Defeat", new[] { 73.42f, 146.83f, 174.61f, 220f }, opening: false));
 
         /// <summary>Сравнение через == учитывает уничтоженные Unity-объекты, ??= — нет.</summary>
         private static AudioClip Cached(ref AudioClip field, Func<AudioClip> make)
@@ -74,130 +75,171 @@ namespace Nuclear.Audio
             return field;
         }
 
+        // ---------- Игрок ----------
+
+        /// <summary>Щелчок счётчика Гейгера: короткий импульс через два резонатора, без резкого верха.</summary>
         private static AudioClip MakeClick()
         {
             var random = new System.Random(1);
-            var data = Buffer(0.02f);
-            var ring = Biquad.BandPass(3200f, 8f);
-            var air = Biquad.HighPass(1500f);
+            var data = Buffer(0.03f);
+            var body = Biquad.BandPass(2400f, 6f);
+            var tick = Biquad.BandPass(4500f, 4f);
+            var soften = Biquad.LowPass(7000f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float noise = White(random) * Mathf.Exp(-t * 1200f);
-                float impulse = i == 0 ? 1f : 0f;
-                data[i] = air.Process(noise) * 0.8f + ring.Process(impulse + noise * 0.3f) * 2f;
+                float impulse = (i == 0 ? 1f : 0f) + White(random) * Mathf.Exp(-t * 2500f) * 0.4f;
+                data[i] = soften.Process(body.Process(impulse) * 1.5f + tick.Process(impulse));
             }
             return ToClip("Geiger Click", data);
         }
 
-        /// <summary>Два приглушённых маской «кхе»: шумный выдох плюс голосовой тон.</summary>
+        /// <summary>
+        /// Кашель в противогазе: шумное «кх» переходит в голосовой толчок (пила через три форманты),
+        /// всё глушится резиной маски. Два толчка, второй слабее.
+        /// </summary>
         private static AudioClip MakeCough()
         {
+            var noise = new PinkNoise(2);
             var random = new System.Random(2);
-            var data = Buffer(0.7f);
-            var breathNoise = Biquad.BandPass(1300f, 0.9f);
-            var formant = Biquad.BandPass(650f, 2.5f);
-            var mask = Biquad.LowPass(2600f);
-            double phase = 0;
+            var data = Buffer(0.75f);
+            var voice = new Saw();
+            var f1 = Biquad.BandPass(600f, 4f);
+            var f2 = Biquad.BandPass(1200f, 5f);
+            var f3 = Biquad.BandPass(2500f, 6f);
+            var aspiration = Biquad.BandPass(1800f, 0.8f);
+            var mask = Biquad.LowPass(2400f);
+            var maskResonance = Biquad.BandPass(900f, 2f);
+
+            foreach (float start in new[] { 0f, 0.32f })
+            {
+                float strength = start > 0f ? 0.8f : 1f;
+                for (int i = Mathf.RoundToInt(start * SampleRate); i < data.Length; i++)
+                {
+                    float local = TimeAt(i) - start;
+                    if (local > 0.3f)
+                        break;
+                    float envelope = Hit(local, 0f, 0.012f, 0.09f) * strength;
+                    float voicedShare = Mathf.Clamp01((local - 0.03f) / 0.05f);
+                    float pitch = (135f - local * 60f) * (1f + (float)(random.NextDouble() - 0.5) * 0.03f);
+                    float glottal = voice.Next(pitch);
+                    float vowel = f1.Process(glottal) + f2.Process(glottal) * 0.6f + f3.Process(glottal) * 0.3f;
+                    float breath = aspiration.Process(noise.Next()) * 2.5f;
+                    data[i] += (breath * (1f - voicedShare * 0.6f) + vowel * voicedShare) * envelope;
+                }
+            }
+
             for (int i = 0; i < data.Length; i++)
             {
-                float t = TimeAt(i);
-                float envelope = Hit(t, 0f, 0.008f, 0.07f) + Hit(t, 0.3f, 0.008f, 0.09f) * 0.85f;
-                float pitch = 130f + 40f * Mathf.Exp(-(t % 0.3f) * 8f);
-                phase += pitch / SampleRate;
-                float voiced = formant.Process(Saw(phase)) * 0.6f;
-                data[i] = mask.Process((breathNoise.Process(White(random)) * 1.2f + voiced) * envelope);
+                float muffled = mask.Process(data[i]);
+                data[i] = muffled + maskResonance.Process(muffled) * 0.4f;
             }
             return ToClip("Cough", data);
         }
 
-        /// <summary>Вдох через фильтр (свистящий), щелчок клапана, выдох — как в противогазе.</summary>
+        /// <summary>Вдох через фильтр (мягкий свист), тихий клапан, выдох с дрожанием резины.</summary>
         private static AudioClip MakeMaskBreath()
         {
-            var random = new System.Random(3);
+            var noise = new PinkNoise(3);
             var data = Buffer(2.8f);
-            var inhale = Biquad.BandPass(600f, 2f);
-            var exhale = Biquad.BandPass(420f, 1.4f);
-            var valve = Biquad.BandPass(2400f, 6f);
-            var mask = Biquad.LowPass(3000f);
+            var inhale = Biquad.BandPass(900f, 1.5f);
+            var hiss = Biquad.HighPass(3000f);
+            var exhale = Biquad.BandPass(450f, 1f);
+            var soften = Biquad.LowPass(5000f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
                 if (i % 64 == 0)
-                    inhale.Set(600f + 300f * Mathf.Clamp01(t / 1.15f), 2f);
-
-                float noise = White(random);
-                float sample = inhale.Process(noise) * Window(t, 0f, 1.15f) * 0.8f
-                    + exhale.Process(noise) * Window(t, 1.35f, 1.4f) * 1.2f
-                    + valve.Process(noise) * Hit(t, 1.24f, 0.002f, 0.012f) * 0.6f;
-                data[i] = mask.Process(sample);
+                    inhale.Set(900f + 400f * Mathf.Clamp01(t / 1.15f), 1.5f);
+                float n = noise.Next();
+                float inhaleEnvelope = Window(t, 0f, 1.15f);
+                float exhaleEnvelope = Window(t, 1.35f, 1.35f) * (1f + 0.3f * Mathf.Sin(2f * Mathf.PI * 28f * t));
+                data[i] = soften.Process(inhale.Process(n) * inhaleEnvelope + hiss.Process(n) * inhaleEnvelope * 0.15f + exhale.Process(n) * exhaleEnvelope * 1.2f);
             }
+            AddGrain(data, 1.24f, 1800f, 0.008f, 0.25f);
             return ToClip("Mask Breath", data, 0.7f);
         }
 
+        /// <summary>Сердце: два глухих толчка с падающим тоном.</summary>
         private static AudioClip MakeHeartbeat()
         {
             var data = Buffer(0.7f);
-            var low = Biquad.LowPass(200f);
-            double phase = 0;
-            for (int i = 0; i < data.Length; i++)
+            var low = Biquad.LowPass(180f);
+            foreach (var (start, strength) in new[] { (0f, 1f), (0.26f, 0.7f) })
             {
-                float t = TimeAt(i);
-                float beat = t < 0.28f ? t : t - 0.28f;
-                phase += (60f - beat * 150f) / SampleRate;
-                float envelope = Hit(t, 0f, 0.005f, 0.06f) + Hit(t, 0.28f, 0.005f, 0.07f) * 0.7f;
-                data[i] = low.Process(Sine(phase) * envelope);
+                double phase = 0;
+                for (int i = Mathf.RoundToInt(start * SampleRate); i < data.Length; i++)
+                {
+                    float local = TimeAt(i) - start;
+                    if (local > 0.25f)
+                        break;
+                    phase += (70f - 25f * Mathf.Clamp01(local / 0.08f)) / SampleRate;
+                    float tone = Sine(phase) + 0.3f * Sine(phase * 2.0);
+                    data[i] += tone * Hit(local, 0f, 0.004f, 0.05f) * strength;
+                }
             }
+            Filter(data, low);
             return ToClip("Heartbeat", data);
         }
 
-        /// <summary>Шаг по пеплу и щебню: хруст, мелкие осколки и глухой удар пяткой.</summary>
-        private static AudioClip MakeStep(string name, int seed, float weight)
+        /// <summary>
+        /// Шаг по пеплу и щебню: десятки коротких «зёрен» разной высоты (хруст камешков)
+        /// и мягкий удар пятки. grains — сколько камешков, spread — за какое время, heel — длина удара.
+        /// </summary>
+        private static AudioClip MakeStep(string name, int seed, int grains, float spread, float heel, float gain)
         {
             var random = new System.Random(seed);
-            var data = Buffer(0.2f * weight);
-            var crunch = Biquad.BandPass(1200f + (seed % 4) * 250f, 0.8f);
-            var grit = Biquad.HighPass(2500f);
-            float gritAmount = 0f;
+            var noise = new PinkNoise(seed);
+            var data = Buffer(spread + 0.12f);
+
+            for (int g = 0; g < grains; g++)
+            {
+                // Больше камешков в начале шага.
+                float start = spread * (float)Math.Pow(random.NextDouble(), 1.8);
+                float frequency = MeshRange(random, 900f, 3800f);
+                float amplitude = MeshRange(random, 0.2f, 1f) * Mathf.Exp(-start / (spread * 0.45f));
+                AddGrain(data, start, frequency, MeshRange(random, 0.0015f, 0.005f), amplitude * 0.35f);
+            }
+
+            var heelFilter = Biquad.LowPass(250f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float noise = White(random);
-                if (random.NextDouble() < 0.004 * Math.Exp(-t * 20f))
-                    gritAmount = 1f;
-                gritAmount *= 0.95f;
-
-                float body = crunch.Process(noise) * Hit(t, 0f, 0.002f, 0.035f * weight);
-                float thud = Mathf.Sin(2f * Mathf.PI * (85f / weight) * t) * Hit(t, 0f, 0.002f, 0.03f * weight) * 0.6f * weight;
-                data[i] = body + grit.Process(noise) * gritAmount * 0.5f + thud;
+                float thump = heelFilter.Process(noise.Next()) * Hit(t, 0f, 0.003f, heel) * 3f
+                    + Mathf.Sin(2f * Mathf.PI * 75f * t) * Hit(t, 0f, 0.003f, heel * 1.2f) * 0.5f;
+                data[i] = (data[i] + thump) * gain;
             }
+
+            Filter(data, Biquad.LowPass(6500f));
+            Filter(data, Biquad.HighPass(60f));
             return ToClip(name, data, 0.8f);
         }
 
+        /// <summary>Шорох одежды и тихий звяк снаряжения при подборе.</summary>
         private static AudioClip MakePickup()
         {
             var random = new System.Random(4);
-            var data = Buffer(0.15f);
-            var cloth = Biquad.BandPass(2200f, 0.6f);
+            var noise = new PinkNoise(4);
+            var data = Buffer(0.2f);
+            var cloth = Biquad.BandPass(1600f, 0.7f);
             for (int i = 0; i < data.Length; i++)
-                data[i] = cloth.Process(White(random)) * Hit(TimeAt(i), 0f, 0.01f, 0.04f);
+                data[i] = cloth.Process(noise.Next()) * Hit(TimeAt(i), 0f, 0.015f, 0.05f) * 3f;
+            for (int g = 0; g < 3; g++)
+                AddGrain(data, MeshRange(random, 0.02f, 0.08f), MeshRange(random, 2200f, 3200f), 0.006f, 0.15f);
             return ToClip("Pickup", data, 0.6f);
         }
 
-        /// <summary>Три щелчка резьбы и шипение: старый фильтр откручен.</summary>
+        /// <summary>Три щелчка резьбы и выход воздуха: старый фильтр откручен.</summary>
         private static AudioClip MakeFilterRemove()
         {
             var random = new System.Random(5);
-            var data = Buffer(0.9f);
-            var thread = Biquad.BandPass(3000f, 5f);
-            var hiss = Biquad.HighPass(3000f);
+            var noise = new PinkNoise(5);
+            var data = Buffer(1f);
+            foreach (float tick in new[] { 0f, 0.11f, 0.23f })
+                AddModes(data, tick, new[] { 3200f, 1900f }, new[] { 1f, 0.5f }, new[] { 0.006f, 0.008f }, 0.6f, random);
+            var air = Biquad.HighPass(2500f);
             for (int i = 0; i < data.Length; i++)
-            {
-                float t = TimeAt(i);
-                float noise = White(random);
-                float clicks = Hit(t, 0f, 0.001f, 0.01f) + Hit(t, 0.12f, 0.001f, 0.01f) + Hit(t, 0.24f, 0.001f, 0.01f);
-                data[i] = thread.Process(noise) * clicks * 2f + hiss.Process(noise) * Window(t, 0.3f, 0.6f) * 0.5f;
-            }
+                data[i] += air.Process(noise.Next()) * Window(TimeAt(i), 0.3f, 0.6f) * 0.6f;
             return ToClip("Filter Remove", data, 0.7f);
         }
 
@@ -205,302 +247,409 @@ namespace Nuclear.Audio
         private static AudioClip MakeFilterAttach()
         {
             var random = new System.Random(6);
-            var data = Buffer(0.4f);
-            var thread = Biquad.BandPass(2600f, 5f);
-            var seal = Biquad.LowPass(400f);
+            var noise = new PinkNoise(6);
+            var data = Buffer(0.45f);
+            foreach (float tick in new[] { 0f, 0.1f })
+                AddModes(data, tick, new[] { 2900f, 1700f }, new[] { 1f, 0.5f }, new[] { 0.006f, 0.008f }, 0.6f, random);
+            var seal = Biquad.LowPass(300f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float noise = White(random);
-                float clicks = Hit(t, 0f, 0.001f, 0.01f) + Hit(t, 0.1f, 0.001f, 0.01f);
-                data[i] = thread.Process(noise) * clicks * 2f + seal.Process(noise) * Hit(t, 0.25f, 0.003f, 0.04f) * 3f;
+                data[i] += seal.Process(noise.Next()) * Hit(t, 0.25f, 0.003f, 0.03f) * 6f
+                    + Mathf.Sin(2f * Mathf.PI * 180f * t) * Hit(t, 0.25f, 0.003f, 0.04f) * 0.3f;
             }
             return ToClip("Filter Attach", data, 0.7f);
         }
 
+        // ---------- Предметы ----------
+
+        /// <summary>Деревянный ящик: глухие собственные частоты доски и удар корпуса.</summary>
         private static AudioClip MakeImpactWood()
         {
             var random = new System.Random(7);
-            var data = Buffer(0.4f);
-            var body = Biquad.LowPass(900f);
-            var knock = Biquad.BandPass(420f, 4f);
+            var data = Buffer(0.35f);
+            AddModes(data, 0f, new[] { 220f, 480f, 840f, 1290f, 1910f }, new[] { 1f, 0.7f, 0.45f, 0.3f, 0.18f }, new[] { 0.07f, 0.05f, 0.035f, 0.025f, 0.015f }, 1f, random);
+            AddTransient(data, 8, 2500f, 0.003f, 0.6f);
+            AddGrain(data, 0f, 110f, 0.03f, 0.8f);
+            return ToClip("Impact Wood", Reverb(data, 0.3f, 0.4f, 0.06f));
+        }
+
+        /// <summary>Аккумулятор: тяжёлый глухой удар пластикового корпуса со свинцом внутри, без звона.</summary>
+        private static AudioClip MakeImpactHeavy()
+        {
+            var random = new System.Random(9);
+            var noise = new PinkNoise(9);
+            var data = Buffer(0.45f);
+            var body = Biquad.LowPass(400f);
             double phase = 0;
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                phase += (110f - 40f * Mathf.Clamp01(t / 0.1f)) / SampleRate;
-                float noise = White(random);
-                data[i] = Sine(phase) * Hit(t, 0f, 0.002f, 0.08f)
-                    + body.Process(noise) * Hit(t, 0f, 0.001f, 0.05f) * 0.8f
-                    + knock.Process(noise) * Hit(t, 0f, 0.001f, 0.06f) * 2f;
+                phase += (80f - 25f * Mathf.Clamp01(t / 0.1f)) / SampleRate;
+                data[i] = Sine(phase) * Hit(t, 0f, 0.002f, 0.08f) + body.Process(noise.Next()) * Hit(t, 0f, 0.002f, 0.04f) * 4f;
             }
-            return ToClip("Impact Wood", data);
+            AddModes(data, 0f, new[] { 310f, 720f, 1180f }, new[] { 0.5f, 0.3f, 0.15f }, new[] { 0.04f, 0.025f, 0.015f }, 1f, random);
+            return ToClip("Impact Heavy", Reverb(data, 0.3f, 0.4f, 0.06f));
         }
 
-        /// <summary>Металл: набор негармоничных обертонов со своим затуханием плюс щелчок удара.</summary>
-        private static AudioClip MakeMetal(string name, float seconds, float[] partials, float[] amplitudes, float[] decays)
+        /// <summary>Жестянка: звонкое «дзынь» и короткий отскок.</summary>
+        private static AudioClip MakeImpactTin()
         {
-            var random = new System.Random(name.Length * 31);
-            var data = Buffer(seconds);
-            var transient = Biquad.HighPass(2000f);
-            for (int i = 0; i < data.Length; i++)
-            {
-                float t = TimeAt(i);
-                float sample = transient.Process(White(random)) * Hit(t, 0f, 0.0005f, 0.01f) * 0.6f;
-                for (int p = 0; p < partials.Length; p++)
-                    sample += Mathf.Sin(2f * Mathf.PI * partials[p] * t) * amplitudes[p] * Hit(t, 0f, 0.001f, decays[p]);
-                data[i] = sample;
-            }
-            return ToClip(name, data);
+            var random = new System.Random(10);
+            var data = Buffer(0.4f);
+            var modes = new[] { 1180f, 2650f, 4120f, 5760f };
+            var decays = new[] { 0.12f, 0.08f, 0.05f, 0.03f };
+            AddModes(data, 0f, modes, new[] { 1f, 0.6f, 0.35f, 0.2f }, decays, 1f, random);
+            AddModes(data, 0.06f, modes, new[] { 1f, 0.6f, 0.35f, 0.2f }, decays, 0.3f, random);
+            AddTransient(data, 10, 4000f, 0.002f, 0.4f);
+            return ToClip("Impact Tin", Reverb(data, 0.25f, 0.4f, 0.05f));
         }
 
-        /// <summary>Треск искр: частые микроразряды и короткое электрическое гудение.</summary>
+        /// <summary>Искры: частые микроразряды, шипение и короткое гудение.</summary>
         private static AudioClip MakeSparks()
         {
-            var random = new System.Random(8);
+            var random = new System.Random(11);
+            var noise = new PinkNoise(11);
             var data = Buffer(0.6f);
-            var crackle = Biquad.HighPass(3000f);
-            var buzz = Biquad.BandPass(400f, 2f);
+            var crackle = Biquad.BandPass(4000f, 1f);
+            var sizzle = Biquad.HighPass(5000f);
+            var buzzFilter = Biquad.LowPass(300f);
+            var buzz = new Saw();
             float discharge = 0f;
-            double phase = 0;
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
                 if (random.NextDouble() < 300.0 / SampleRate * Math.Exp(-t * 4f))
                     discharge = 1f;
                 discharge *= 0.97f;
-                phase += 100.0 / SampleRate;
-                data[i] = crackle.Process(White(random)) * discharge + buzz.Process(Saw(phase)) * Mathf.Exp(-t / 0.25f) * 0.3f;
+                float n = noise.Next();
+                data[i] = SoftClip(crackle.Process(White(random)) * discharge * 2f
+                    + sizzle.Process(n) * Mathf.Exp(-t / 0.3f) * 0.5f
+                    + buzzFilter.Process(buzz.Next(100f)) * Mathf.Exp(-t / 0.25f) * 0.3f);
             }
             return ToClip("Sparks", data);
         }
 
-        /// <summary>Петля ветра: низкий гул с порывами и свист в щелях. Порывы кратны длине петли.</summary>
+        // ---------- Мир ----------
+
+        /// <summary>
+        /// Ветер в стерео: в каждом канале свой розовый шум, низкий гул, средний поток и тихий свист.
+        /// Порывы — сумма синусов с целым числом периодов на длину петли, поэтому петля бесшовная.
+        /// </summary>
         private static AudioClip MakeWind()
         {
-            const float length = 12f;
-            const float fade = 0.5f;
-            var random = new System.Random(9);
+            const float length = 16f;
+            const float fade = 0.6f;
+            var left = WindChannel(21, length, fade, 0f);
+            var right = WindChannel(22, length, fade, 0.9f);
+            return ToStereoClip("Wind", LoopCrossfade(left, fade), LoopCrossfade(right, fade), 0.7f);
+        }
+
+        private static float[] WindChannel(int seed, float length, float fade, float phaseShift)
+        {
+            var noise = new PinkNoise(seed);
             var data = Buffer(length + fade);
-            var low = Biquad.LowPass(500f);
-            var whistle = Biquad.BandPass(850f, 9f);
-            var highWhistle = Biquad.BandPass(1400f, 12f);
-            float brown = 0f;
+            var low = Biquad.LowPass(300f);
+            var mid = Biquad.BandPass(700f, 0.7f);
+            var whistle = Biquad.BandPass(900f, 6f);
+            float Gust(float t, float a, float b) =>
+                0.5f + 0.25f * Mathf.Sin(2f * Mathf.PI * a * t / length + phaseShift) + 0.15f * Mathf.Sin(2f * Mathf.PI * b * t / length + 1.3f + phaseShift);
+
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float noise = White(random);
-                brown = brown * 0.98f + noise * 0.02f;
-                float gust = 0.55f
-                    + 0.25f * Mathf.Sin(2f * Mathf.PI * t / length)
-                    + 0.15f * Mathf.Sin(2f * Mathf.PI * 3f * t / length + 1.3f)
-                    + 0.05f * Mathf.Sin(2f * Mathf.PI * 7f * t / length + 0.4f);
-                data[i] = low.Process(brown * 6f) * gust
-                    + whistle.Process(noise) * 0.5f * gust * gust
-                    + highWhistle.Process(noise) * 0.25f * Mathf.Max(0f, gust - 0.6f);
+                if (i % 128 == 0)
+                    whistle.Set(900f + 150f * Mathf.Sin(2f * Mathf.PI * t / length + phaseShift), 6f);
+                float n = noise.Next();
+                float gust = Gust(t, 1f, 3f);
+                float breeze = Gust(t, 2f, 5f);
+                data[i] = low.Process(n) * 2.5f * gust + mid.Process(n) * 1.2f * breeze + whistle.Process(n) * 0.6f * gust * gust * breeze;
             }
-            return ToClip("Wind", LoopCrossfade(data, fade), 0.8f);
+            return data;
         }
 
-        /// <summary>Далёкий скрип металла: пила с плавающим тоном через узкий фильтр и эхо.</summary>
+        /// <summary>Далёкий скрип металла с эхом пустых улиц.</summary>
         private static AudioClip MakeDistantCreak()
         {
-            var random = new System.Random(10);
+            var random = new System.Random(12);
             var data = Buffer(2.4f);
-            var resonance = Biquad.BandPass(700f, 3f);
-            var distance = Biquad.LowPass(1500f);
-            double phase = 0;
+            var saw = new Saw();
+            var r1 = Biquad.BandPass(650f, 4f);
+            var r2 = Biquad.BandPass(1300f, 6f);
+            var distance = Biquad.LowPass(1800f);
             float jitter = 0f;
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
                 jitter = jitter * 0.999f + White(random) * 0.5f;
-                phase += (160f - 40f * (t / 2.4f) + jitter) / SampleRate;
-                data[i] = distance.Process(resonance.Process(Saw(phase)) * Window(t, 0f, 1.8f));
+                float source = saw.Next(160f - 40f * (t / 2.4f) + jitter);
+                data[i] = distance.Process((r1.Process(source) + r2.Process(source) * 0.5f) * Window(t, 0f, 1.8f));
             }
-            Echo(data, new[] { 0.13f, 0.29f, 0.47f }, new[] { 0.4f, 0.25f, 0.15f });
-            return ToClip("Distant Creak", data, 0.6f);
+            return ToClip("Distant Creak", Reverb(data, 1.5f, 0.85f, 0.35f), 0.6f);
         }
 
-        /// <summary>Далёкий вой: голосовой тон с вибрато, приглушённый расстоянием.</summary>
+        /// <summary>Далёкий протяжный вой — то ли ветер в трубах, то ли что-то живое.</summary>
         private static AudioClip MakeDistantHowl()
         {
             var data = Buffer(3.6f);
-            var formant = Biquad.BandPass(700f, 1.5f);
+            var saw = new Saw();
+            var formant = Biquad.BandPass(700f, 2f);
             var distance = Biquad.LowPass(1200f);
             double phase = 0;
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float pitch = 380f + 180f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 2.8f)) + 8f * Mathf.Sin(2f * Mathf.PI * 6f * t);
+                float pitch = 380f + 180f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 2.8f)) + 8f * Mathf.Sin(2f * Mathf.PI * 5.5f * t);
                 phase += pitch / SampleRate;
-                float voice = Sine(phase) + 0.3f * Saw(phase);
-                data[i] = distance.Process(formant.Process(voice) * Window(t, 0f, 2.8f));
+                float voice = Sine(phase) + 0.25f * formant.Process(saw.Next(pitch));
+                data[i] = distance.Process(voice * Window(t, 0f, 2.8f));
             }
-            Echo(data, new[] { 0.21f, 0.43f, 0.71f }, new[] { 0.45f, 0.3f, 0.18f });
-            return ToClip("Distant Howl", data, 0.6f);
+            return ToClip("Distant Howl", Reverb(data, 2f, 0.9f, 0.4f), 0.6f);
         }
 
-        /// <summary>Петля механизма двери: низкий гул, сетевые 50 Гц и стрекот шестерёнок.</summary>
+        // ---------- Дверь бункера ----------
+
+        /// <summary>Петля механизма двери: низкий гул, мягкие 50 Гц и негромкое стрекотание шестерёнок.</summary>
         private static AudioClip MakeRumble()
         {
             const float length = 3f;
             const float fade = 0.25f;
-            var random = new System.Random(11);
+            var random = new System.Random(13);
+            var noise = new PinkNoise(13);
             var data = Buffer(length + fade);
-            var low = Biquad.LowPass(150f);
-            var gears = Biquad.BandPass(1500f, 4f);
-            float brown = 0f;
+            var low = Biquad.LowPass(140f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float noise = White(random);
-                brown = brown * 0.985f + noise * 0.015f;
-                float tick = Hit(t % 0.0625f, 0f, 0.0005f, 0.004f);
-                data[i] = low.Process(brown * 10f)
-                    + Mathf.Sin(2f * Mathf.PI * 50f * t) * 0.25f
-                    + Mathf.Sin(2f * Mathf.PI * 100f * t) * 0.1f
-                    + gears.Process(noise) * tick * 0.6f;
+                data[i] = low.Process(noise.Next()) * 4f + Mathf.Sin(2f * Mathf.PI * 50f * t) * 0.18f + Mathf.Sin(2f * Mathf.PI * 100f * t) * 0.06f;
             }
+            for (float tick = 0f; tick < length + fade; tick += 0.0625f)
+                AddGrain(data, tick, MeshRange(random, 1100f, 1400f), 0.003f, 0.12f);
             return ToClip("Rumble", LoopCrossfade(data, fade), 0.7f);
         }
 
-        /// <summary>Двухтональный сигнал тревоги, будто из старого динамика.</summary>
+        /// <summary>Двухтональная сирена: тёплый тон с обертонами вместо резкого меандра, с эхом.</summary>
         private static AudioClip MakeDoorAlarm()
         {
             var data = Buffer(1f);
-            var speaker = Biquad.LowPass(3000f);
-            for (int i = 0; i < data.Length; i++)
+            foreach (var (start, frequency) in new[] { (0f, 740f), (0.45f, 587f) })
             {
-                float t = TimeAt(i);
-                float tone = SoftClip(3f * Mathf.Sin(2f * Mathf.PI * 660f * t)) * Window(t, 0f, 0.42f)
-                    + SoftClip(3f * Mathf.Sin(2f * Mathf.PI * 520f * t)) * Window(t, 0.5f, 0.42f);
-                data[i] = speaker.Process(tone);
+                for (int i = Mathf.RoundToInt(start * SampleRate); i < data.Length; i++)
+                {
+                    float local = TimeAt(i) - start;
+                    if (local > 0.4f)
+                        break;
+                    float f = frequency * (1f + 0.004f * Mathf.Sin(2f * Mathf.PI * 6f * local));
+                    float tone = Mathf.Sin(2f * Mathf.PI * f * local) + 0.25f * Mathf.Sin(4f * Mathf.PI * f * local) + 0.1f * Mathf.Sin(6f * Mathf.PI * f * local);
+                    data[i] += tone * Window(local, 0f, 0.4f);
+                }
             }
-            return ToClip("Door Alarm", data, 0.6f);
+            return ToClip("Door Alarm", Reverb(data, 0.8f, 0.7f, 0.25f), 0.6f);
         }
 
-        /// <summary>Петля дыхания Слепыша: мокрый вдох с бульканьем и хриплый выдох с рыком.</summary>
-        private static AudioClip MakeBlindBreath()
+        /// <summary>Тяжёлый лязг створки с отзвуком.</summary>
+        private static AudioClip MakeDoorClunk()
         {
-            const float length = 3.2f;
+            var random = new System.Random(14);
+            var data = Buffer(1.4f);
+            AddModes(data, 0f, new[] { 61f, 97f, 213f, 397f, 611f, 950f }, new[] { 1f, 0.8f, 0.5f, 0.3f, 0.2f, 0.1f }, new[] { 0.6f, 0.5f, 0.35f, 0.25f, 0.15f, 0.08f }, 1f, random);
+            AddTransient(data, 14, 1500f, 0.004f, 0.5f);
+            return ToClip("Door Clunk", Reverb(data, 1f, 0.75f, 0.25f));
+        }
+
+        // ---------- Слепыш ----------
+
+        /// <summary>
+        /// Петля дыхания-урчания: морские свинки урчат частыми низкими толчками. У гиганта это
+        /// 55 Гц с обертонами, пульсирующие 12.5 раз в секунду, поверх — сиплое дыхание.
+        /// </summary>
+        private static AudioClip MakeBlindPurr()
+        {
+            const float length = 3.6f;
             const float fade = 0.2f;
-            var random = new System.Random(12);
+            var noise = new PinkNoise(15);
             var data = Buffer(length + fade);
-            var wet = Biquad.BandPass(350f, 3f);
-            var rasp = Biquad.BandPass(900f, 1.2f);
-            var growl = Biquad.BandPass(300f, 2f);
-            var body = Biquad.LowPass(4000f);
-            double phase = 0;
+            var breath = Biquad.BandPass(600f, 0.8f);
+            var soften = Biquad.LowPass(2000f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
                 float local = t % length;
-                float noise = White(random);
-                phase += 68.0 / SampleRate;
-                float inhale = wet.Process(noise) * Window(local, 0f, 1.3f) * (0.7f + 0.3f * Mathf.Sin(2f * Mathf.PI * 28f * t));
-                float exhale = (rasp.Process(noise) + growl.Process(Saw(phase)) * 0.5f) * Window(local, 1.5f, 1.5f);
-                data[i] = body.Process(inhale * 1.2f + exhale);
+                float pulse = Mathf.Pow(0.5f + 0.5f * Mathf.Cos(2f * Mathf.PI * 12.5f * t), 3f);
+                float tone = Mathf.Sin(2f * Mathf.PI * 55f * t) + 0.6f * Mathf.Sin(2f * Mathf.PI * 110f * t) + 0.3f * Mathf.Sin(2f * Mathf.PI * 165f * t);
+                float inhale = Window(local, 0f, 1.4f);
+                float exhale = Window(local, 1.6f, 1.8f);
+                float purr = tone * pulse * (0.35f * inhale + exhale);
+                float air = breath.Process(noise.Next()) * (inhale * 1.6f + exhale * 0.8f);
+                data[i] = soften.Process(purr + air * 2f);
             }
-            return ToClip("Blind Breath", LoopCrossfade(data, fade), 0.8f);
+            return ToClip("Blind Purr", LoopCrossfade(data, fade), 0.8f);
         }
 
-        /// <summary>Рык и визг при броске: низкий рокочущий тон и поднимающийся вопль, перегруженные.</summary>
+        /// <summary>Серия из трёх быстрых шмыганий носом — Слепыш ищет запах и звук.</summary>
+        private static AudioClip MakeSniff()
+        {
+            var noise = new PinkNoise(16);
+            var data = Buffer(0.5f);
+            var nose = Biquad.BandPass(2000f, 1.2f);
+            var air = Biquad.HighPass(1200f);
+            foreach (var (start, strength) in new[] { (0f, 1f), (0.12f, 0.85f), (0.24f, 0.7f) })
+            {
+                for (int i = Mathf.RoundToInt(start * SampleRate); i < data.Length; i++)
+                {
+                    float local = TimeAt(i) - start;
+                    if (local > 0.1f)
+                        break;
+                    if (i % 32 == 0)
+                        nose.Set(2000f + 1200f * (local / 0.1f), 1.2f);
+                    data[i] += air.Process(nose.Process(noise.Next())) * Hit(local, 0f, 0.01f, 0.03f) * strength * 4f;
+                }
+            }
+            return ToClip("Sniff", data, 0.7f);
+        }
+
+        /// <summary>
+        /// Визг при броске: морская свинка кричит «уи-и-ик» — восходящий писк. У гиганта он ниже на октаву,
+        /// с носовыми формантами, а под ним низкий рык.
+        /// </summary>
         private static AudioClip MakeScream()
         {
-            var random = new System.Random(13);
-            var data = Buffer(1.6f);
-            var throat = Biquad.BandPass(500f, 2f);
-            var throatHigh = Biquad.BandPass(1400f, 3f);
-            var shriek = Biquad.BandPass(2200f, 2.5f);
+            var random = new System.Random(17);
+            var noise = new PinkNoise(17);
+            var data = Buffer(1.4f);
+            var squeal = new Saw();
+            var growl = new Saw();
+            var f1 = Biquad.BandPass(900f, 3f);
+            var f2 = Biquad.BandPass(2100f, 4f);
+            var f3 = Biquad.BandPass(3300f, 5f);
+            var growlFilter = Biquad.LowPass(400f);
             var breath = Biquad.BandPass(1800f, 1f);
-            double growlPhase = 0, shriekPhase = 0;
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float noise = White(random);
-                growlPhase += (85f + 10f * Mathf.Sin(2f * Mathf.PI * 7f * t)) / SampleRate;
-                shriekPhase += (300f + 220f * Mathf.Clamp01((t - 0.15f) / 0.4f) + 15f * Mathf.Sin(2f * Mathf.PI * 9f * t)) / SampleRate;
-
-                float growl = Saw(growlPhase) * (0.8f + 0.2f * noise);
-                float sample = (throat.Process(growl) + 0.6f * throatHigh.Process(growl)) * Window(t, 0f, 1.6f)
-                    + shriek.Process(Saw(shriekPhase)) * Window(t, 0.15f, 1.3f) * 0.8f
-                    + breath.Process(noise) * Window(t, 0f, 1.6f) * 0.2f;
-                data[i] = SoftClip(sample * 1.5f);
+                float pitch = t < 0.15f ? Mathf.Lerp(320f, 520f, t / 0.15f)
+                    : t < 0.8f ? 520f + 25f * Mathf.Sin(2f * Mathf.PI * 6f * t)
+                    : Mathf.Lerp(520f, 760f, Mathf.Clamp01((t - 0.8f) / 0.3f));
+                float source = squeal.Next(pitch);
+                float nasal = f1.Process(source) + f2.Process(source) * 0.7f + f3.Process(source) * 0.35f;
+                float rough = growlFilter.Process(growl.Next(70f + (float)random.NextDouble() * 8f)) * (0.8f + 0.2f * White(random));
+                float sample = nasal * Window(t, 0f, 1.25f) + rough * Window(t, 0f, 1.1f) * 0.6f + breath.Process(noise.Next()) * Window(t, 0f, 1.2f) * 0.5f;
+                data[i] = SoftClip(sample * 1.3f);
             }
-            return ToClip("Scream", data);
+            return ToClip("Scream", Reverb(data, 0.5f, 0.6f, 0.15f));
         }
 
-        /// <summary>Свист взмаха: полоса шума, которая проходит вверх и обратно вниз.</summary>
-        private static AudioClip MakeSwipe()
+        /// <summary>Укус: короткий бросок воздуха и два щелчка резцов.</summary>
+        private static AudioClip MakeBite()
         {
-            var random = new System.Random(14);
-            var data = Buffer(0.35f);
-            var air = Biquad.BandPass(500f, 1.5f);
+            var random = new System.Random(18);
+            var noise = new PinkNoise(18);
+            var data = Buffer(0.4f);
+            var whoosh = Biquad.BandPass(300f, 1.2f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
                 if (i % 32 == 0)
-                {
-                    float x = t / 0.35f;
-                    air.Set(x < 0.5f ? Mathf.Lerp(500f, 2400f, x * 2f) : Mathf.Lerp(2400f, 700f, (x - 0.5f) * 2f), 1.5f);
-                }
-                data[i] = air.Process(White(random)) * Window(t, 0f, 0.35f);
+                    whoosh.Set(Mathf.Lerp(300f, 1500f, Mathf.Clamp01(t / 0.15f)), 1.2f);
+                data[i] = whoosh.Process(noise.Next()) * Window(t, 0f, 0.16f) * 3f;
             }
-            return ToClip("Swipe", data, 0.7f);
+            foreach (float clack in new[] { 0.14f, 0.2f })
+                AddModes(data, clack, new[] { 2200f, 3400f, 5100f }, new[] { 0.8f, 1f, 0.5f }, new[] { 0.012f, 0.01f, 0.006f }, 0.8f, random);
+            AddGrain(data, 0.14f, 120f, 0.025f, 0.6f);
+            return ToClip("Bite", data);
         }
 
-        /// <summary>Удар по живому: глухой низ и шлепок.</summary>
+        /// <summary>Стук зубов: так морские свинки предупреждают. Звучит, когда Слепыш потерял добычу.</summary>
+        private static AudioClip MakeChatter()
+        {
+            var random = new System.Random(19);
+            var data = Buffer(0.6f);
+            for (int c = 0; c < 8; c++)
+            {
+                float start = c / 18f + MeshRange(random, -0.004f, 0.004f);
+                AddModes(data, start, new[] { 2600f, 3900f }, new[] { 1f, 0.6f }, new[] { 0.008f, 0.005f }, 1f - c * 0.08f, random);
+            }
+            return ToClip("Chatter", Reverb(data, 0.3f, 0.5f, 0.1f), 0.7f);
+        }
+
+        /// <summary>Попадание по игроку: глухой удар и хруст.</summary>
         private static AudioClip MakeHitFlesh()
         {
-            var random = new System.Random(15);
+            var random = new System.Random(20);
+            var noise = new PinkNoise(20);
             var data = Buffer(0.4f);
-            var slap = Biquad.LowPass(1800f);
-            var crunch = Biquad.BandPass(900f, 1.5f);
+            var slap = Biquad.LowPass(1500f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float noise = White(random);
-                data[i] = Mathf.Sin(2f * Mathf.PI * 70f * t) * Hit(t, 0f, 0.002f, 0.08f)
-                    + slap.Process(noise) * Hit(t, 0f, 0.002f, 0.04f) * 0.8f
-                    + crunch.Process(noise) * Hit(t, 0.01f, 0.002f, 0.05f) * 0.6f;
+                data[i] = Mathf.Sin(2f * Mathf.PI * 65f * t) * Hit(t, 0f, 0.002f, 0.07f) + slap.Process(noise.Next()) * Hit(t, 0f, 0.002f, 0.035f) * 4f;
             }
+            for (int g = 0; g < 8; g++)
+                AddGrain(data, MeshRange(random, 0.005f, 0.05f), MeshRange(random, 800f, 1600f), 0.004f, 0.25f);
             return ToClip("Hit Flesh", data);
         }
 
-        /// <summary>Щелчок языком: Слепыш «прощупывает» пространство звуком.</summary>
-        private static AudioClip MakeEchoClick()
+        /// <summary>Тяжёлый мягкий шаг гиганта: низкий удар в землю и осыпающаяся земля.</summary>
+        private static AudioClip MakeHeavyStep()
         {
-            var random = new System.Random(16);
-            var data = Buffer(0.12f);
-            var tongue = Biquad.BandPass(2600f, 12f);
+            var random = new System.Random(21);
+            var noise = new PinkNoise(21);
+            var data = Buffer(0.45f);
+            var earth = Biquad.LowPass(180f);
+            double phase = 0;
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float impulse = i < 40 ? 1f : 0f;
-                data[i] = tongue.Process(impulse + White(random) * Mathf.Exp(-t * 400f) * 0.2f);
+                phase += (45f - 15f * Mathf.Clamp01(t / 0.12f)) / SampleRate;
+                data[i] = Sine(phase) * Hit(t, 0f, 0.006f, 0.09f) + earth.Process(noise.Next()) * Hit(t, 0f, 0.004f, 0.06f) * 5f;
             }
-            return ToClip("Echo Click", data, 0.8f);
+            for (int g = 0; g < 10; g++)
+                AddGrain(data, MeshRange(random, 0.01f, 0.12f), MeshRange(random, 300f, 900f), 0.006f, 0.08f);
+            return ToClip("Heavy Step", Reverb(data, 0.4f, 0.5f, 0.1f));
         }
 
-        /// <summary>Медленный аккорд для конца уровня. decayBias &lt; 1 — к концу звук глохнет и темнеет.</summary>
-        private static AudioClip MakeChord(string name, float[] notes, float decayBias)
+        // ---------- Итог уровня ----------
+
+        /// <summary>
+        /// Тёплый аккорд из трёх слегка расстроенных пил на ноту, через мягкий фильтр.
+        /// При победе фильтр раскрывается (светлеет), при поражении закрывается (глохнет).
+        /// </summary>
+        private static AudioClip MakePad(string name, float[] notes, bool opening)
         {
             var data = Buffer(4.5f);
-            var soften = Biquad.LowPass(name == "Defeat" ? 700f : 2500f);
+            var voices = new Saw[notes.Length * 3];
+            for (int v = 0; v < voices.Length; v++)
+                voices[v] = new Saw();
+            var tone = Biquad.LowPass(800f, 0.9f);
             for (int i = 0; i < data.Length; i++)
             {
                 float t = TimeAt(i);
-                float envelope = Mathf.Clamp01(t / 1.2f) * Mathf.Exp(-Mathf.Max(0f, t - 1.5f) * (1.1f - decayBias) * 2f) * Window(t, 0f, 4.5f);
+                if (i % 128 == 0)
+                    tone.Set(opening ? Mathf.Lerp(600f, 3000f, t / 3f) : Mathf.Lerp(1400f, 250f, t / 3.5f), 0.9f);
                 float sample = 0f;
                 for (int n = 0; n < notes.Length; n++)
                 {
-                    float detune = 1f + 0.002f * Mathf.Sin(2f * Mathf.PI * (0.3f + n * 0.1f) * t);
-                    sample += Mathf.Sin(2f * Mathf.PI * notes[n] * detune * t) / (1f + n * 0.4f);
+                    for (int d = 0; d < 3; d++)
+                        sample += voices[n * 3 + d].Next(notes[n] * (1f + (d - 1) * 0.004f)) / (1f + n * 0.3f);
                 }
-                data[i] = soften.Process(sample * envelope);
+                float envelope = Mathf.Clamp01(t / 0.8f) * Window(t, 0f, 4.5f) * (opening ? 1f : Mathf.Exp(-t * 0.3f));
+                data[i] = tone.Process(sample * envelope);
             }
-            return ToClip(name, data, 0.6f);
+            return ToClip(name, Reverb(data, 2f, 0.9f, 0.35f), 0.6f);
         }
+
+        // ---------- Вспомогательное ----------
+
+        /// <summary>Короткий шумовой щелчок в начале удара (касание поверхности).</summary>
+        private static void AddTransient(float[] data, int seed, float cutoff, float decay, float gain)
+        {
+            var noise = new PinkNoise(seed);
+            var filter = Biquad.LowPass(cutoff);
+            int length = Mathf.Min(data.Length, Mathf.CeilToInt(decay * 8f * SampleRate));
+            for (int i = 0; i < length; i++)
+                data[i] += filter.Process(noise.Next()) * Mathf.Exp(-TimeAt(i) / decay) * gain * 4f;
+        }
+
+        private static float MeshRange(System.Random random, float min, float max) => min + (float)random.NextDouble() * (max - min);
     }
 }

@@ -62,17 +62,19 @@ namespace Nuclear.Enemies
         private AudioSource voice;
         private AudioSource breathing;
         private float nextClickTime;
-        private int clicksLeft;
         private Renderer head;
         private MaterialPropertyBlock headBlock;
 
-        private Vector3 HearingPoint => transform.position + Vector3.up * 2f;
+        private Vector3 HearingPoint => transform.position + Vector3.up * 1.2f;
+
+        /// <summary>Откуда кусает: морда спереди длинного тела, а не его центр.</summary>
+        private Vector3 MouthPoint => transform.position + transform.forward * 1.3f;
 
         private void Awake()
         {
-            voice = CreateAudioSource(30f);
-            breathing = CreateAudioSource(12f);
-            breathing.clip = ProceduralAudio.BlindBreath;
+            voice = SoundSources.Create3D(gameObject, maxDistance: 30f);
+            breathing = SoundSources.Create3D(gameObject, maxDistance: 14f);
+            breathing.clip = ProceduralAudio.BlindPurr;
             breathing.loop = true;
 
             var headTransform = transform.Find("Head");
@@ -94,8 +96,8 @@ namespace Nuclear.Enemies
 
             home = transform.position;
             agent = gameObject.AddComponent<NavMeshAgent>();
-            agent.radius = 0.4f;
-            agent.height = 2.3f;
+            agent.radius = 0.5f;
+            agent.height = 1.6f;
             agent.acceleration = 20f;
             agent.angularSpeed = 360f;
             agent.stoppingDistance = 0.6f;
@@ -178,7 +180,7 @@ namespace Nuclear.Enemies
         private float DistanceToBody(Vector3 point)
         {
             Vector3 feet = transform.position;
-            float height = Mathf.Clamp(point.y, feet.y, feet.y + 2.3f);
+            float height = Mathf.Clamp(point.y, feet.y, feet.y + 1.6f);
             return Vector3.Distance(new Vector3(feet.x, height, feet.z), point);
         }
 
@@ -220,7 +222,7 @@ namespace Nuclear.Enemies
         {
             foreach (var survival in AlivePlayers())
             {
-                if (Vector3.Distance(survival.transform.position, transform.position) <= bumpRange)
+                if (Vector3.Distance(survival.transform.position, MouthPoint) <= bumpRange)
                 {
                     Swipe();
                     return;
@@ -238,7 +240,7 @@ namespace Nuclear.Enemies
             bool hit = false;
             foreach (var survival in AlivePlayers())
             {
-                if (Vector3.Distance(survival.transform.position, transform.position) <= swipeRange)
+                if (Vector3.Distance(survival.transform.position, MouthPoint) <= swipeRange)
                 {
                     survival.TakeDamage(swipeDamage);
                     hit = true;
@@ -248,28 +250,21 @@ namespace Nuclear.Enemies
         }
 
         /// <summary>
-        /// Пока слушает или проверяет шум, Слепыш щёлкает языком сериями по 2–3.
-        /// Играется у всех локально: по щелчкам его можно засечь в тумане.
+        /// Пока слушает или проверяет шум, Слепыш принюхивается звёздчатым носом сериями шмыганий.
+        /// Играется у всех локально: по этому звуку его можно засечь в тумане.
         /// </summary>
         private void UpdateEchoClicks()
         {
             var state = CurrentState.Value;
             if (state != State.Listen && state != State.Investigate)
-            {
-                clicksLeft = 0;
                 return;
-            }
 
             if (Time.time < nextClickTime)
                 return;
 
-            if (clicksLeft <= 0)
-                clicksLeft = Random.Range(2, 4);
-
-            voice.pitch = Random.Range(0.92f, 1.08f);
-            voice.PlayOneShot(ProceduralAudio.EchoClick, 0.9f);
-            clicksLeft--;
-            nextClickTime = Time.time + (clicksLeft > 0 ? 0.13f : Random.Range(1.2f, 2.2f));
+            voice.pitch = Random.Range(0.9f, 1.1f);
+            voice.PlayOneShot(ProceduralAudio.Sniff, 0.8f);
+            nextClickTime = Time.time + Random.Range(1.4f, 2.6f);
         }
 
         private IEnumerable<PlayerSurvival> AlivePlayers()
@@ -297,13 +292,19 @@ namespace Nuclear.Enemies
                 voice.pitch = Random.Range(0.95f, 1.05f);
                 voice.PlayOneShot(ProceduralAudio.Scream);
             }
+            else if (current == State.Listen && previous == State.Rush)
+            {
+                // Добежал и никого не нашёл — злобно стучит зубами.
+                voice.pitch = Random.Range(0.95f, 1.05f);
+                voice.PlayOneShot(ProceduralAudio.Chatter, 0.9f);
+            }
         }
 
         [Rpc(SendTo.ClientsAndHost)]
         private void SwipeSoundRpc(bool hit)
         {
             voice.pitch = 1f;
-            voice.PlayOneShot(ProceduralAudio.Swipe);
+            voice.PlayOneShot(ProceduralAudio.Bite);
             if (hit)
                 voice.PlayOneShot(ProceduralAudio.HitFlesh);
         }
@@ -328,17 +329,6 @@ namespace Nuclear.Enemies
             headBlock.SetColor(ColorId, color);
             headBlock.SetColor(BaseColorId, color);
             head.SetPropertyBlock(headBlock);
-        }
-
-        private AudioSource CreateAudioSource(float maxDistance)
-        {
-            var source = gameObject.AddComponent<AudioSource>();
-            source.spatialBlend = 1f;
-            source.rolloffMode = AudioRolloffMode.Linear;
-            source.minDistance = 1f;
-            source.maxDistance = maxDistance;
-            source.playOnAwake = false;
-            return source;
         }
     }
 }

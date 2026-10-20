@@ -18,16 +18,13 @@ namespace Nuclear.World
 
         private void Start()
         {
-            var wind = gameObject.AddComponent<AudioSource>();
+            var wind = SoundSources.Create2D(gameObject);
             wind.clip = ProceduralAudio.Wind;
             wind.loop = true;
             wind.volume = windVolume;
-            wind.spatialBlend = 0f;
             wind.Play();
 
-            distant = gameObject.AddComponent<AudioSource>();
-            distant.spatialBlend = 0f;
-            distant.playOnAwake = false;
+            distant = SoundSources.Create2D(gameObject);
             nextDistantTime = Time.time + Random.Range(distantInterval.x, distantInterval.y) * 0.5f;
         }
 

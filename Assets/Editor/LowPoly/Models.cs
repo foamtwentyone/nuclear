@@ -42,54 +42,95 @@ namespace Nuclear.EditorTools.LowPoly
             k.Cylinder(new Vector3(0f, 0.69f, 0.12f), Quaternion.Euler(90f, 0f, 0f), 0.055f, 0.055f, 0.1f, 8, Swatch.FilterOlive, Swatch.FilterOliveDark);
         }
 
-        /// <summary>Тело Слепыша без головы: сутулый, длиннорукий. Опорная точка — между ступней.</summary>
-        public static void BlindOneBody(MeshKit k)
-        {
-            foreach (float side in new[] { -1f, 1f })
-            {
-                var hip = new Vector3(0.15f * side, 1.05f, 0f);
-                var knee = new Vector3(0.18f * side, 0.55f, 0.12f);
-                var ankle = new Vector3(0.17f * side, 0.06f, -0.05f);
-                k.Limb(hip, knee, 0.1f, 0.07f, 6, Swatch.Skin);
-                k.Limb(knee, ankle, 0.07f, 0.05f, 6, Swatch.SkinDark);
-                k.Box(new Vector3(0.17f * side, 0.04f, 0.06f), new Vector3(0.14f, 0.08f, 0.3f), Swatch.SkinDark);
+        // Слепыш — гигантская морская свинка-мутант без глаз, со звёздчатым носом, как у крота-звездоноса.
+        // Части отдельно, чтобы их анимировать (BlindOneAnimator): тело, голова с носом, четыре лапы.
 
-                var shoulder = new Vector3(0.3f * side, 1.72f, 0.33f);
-                var elbow = new Vector3(0.38f * side, 1.25f, 0.45f);
-                var wrist = new Vector3(0.36f * side, 0.55f, 0.55f);
-                k.Limb(shoulder, elbow, 0.07f, 0.055f, 6, Swatch.Skin);
-                k.Limb(elbow, wrist, 0.055f, 0.04f, 6, Swatch.SkinDark);
-                k.Box(wrist + new Vector3(0f, -0.05f, 0.01f), new Vector3(0.1f, 0.1f, 0.12f), Swatch.Skin);
-                for (int claw = -1; claw <= 1; claw++)
-                {
-                    var root = wrist + new Vector3(0.03f * claw, -0.09f, 0.04f);
-                    k.Limb(root, root + new Vector3(0.02f * claw, -0.25f, 0.07f), 0.015f, 0f, 4, Swatch.Claw);
-                }
+        /// <summary>Точки крепления частей Слепыша относительно корня (на земле под центром, морда в +Z).</summary>
+        public static readonly Vector3 BlindOneNeck = new(0f, 0.88f, 0.95f);
+        public static readonly Vector3 BlindOneNose = new(0f, -0.05f, 0.8f);
+        public static readonly Vector3[] BlindOneHips =
+        {
+            new(-0.42f, 0.45f, 0.75f), new(0.42f, 0.45f, 0.75f), new(-0.48f, 0.45f, -0.7f), new(0.48f, 0.45f, -0.7f),
+        };
+
+        private static readonly Swatch[] PatchyFur =
+        {
+            Swatch.Fur, Swatch.Fur, Swatch.Fur, Swatch.FurDark, Swatch.FurDark, Swatch.FurPale, Swatch.SkinDark,
+        };
+
+        /// <summary>Тело: круглое, пятнистое, с проплешинами, гребнем шипастой шерсти и опухолями на боках.</summary>
+        public static void BlindOneBody(MeshKit k, System.Random random)
+        {
+            // Полюса эллипсоида по Y; поворот на 90° по X кладёт их вдоль тела.
+            var lengthwise = Quaternion.Euler(90f, 0f, 0f);
+            k.Ellipsoid(new Vector3(0f, 0.82f, -0.05f), lengthwise, new Vector3(0.72f, 1.3f, 0.66f), 7, 10, PatchyFur, random, 0.06f);
+            k.Ellipsoid(new Vector3(0f, 0.78f, -0.7f), lengthwise, new Vector3(0.68f, 0.6f, 0.62f), 5, 10, PatchyFur, random, 0.05f);
+
+            for (int i = 0; i < 9; i++)
+            {
+                float z = Mathf.Lerp(-1.0f, 0.75f, i / 8f);
+                float top = 0.82f + 0.66f * Mathf.Sqrt(Mathf.Max(0f, 1f - (z + 0.05f) * (z + 0.05f) / 1.69f)) - 0.05f;
+                var tilt = Quaternion.Euler(-35f + Range(random, -10f, 10f), 0f, Range(random, -15f, 15f));
+                k.Cylinder(new Vector3(Range(random, -0.05f, 0.05f), top, z), tilt, Range(random, 0.05f, 0.08f), 0f, Range(random, 0.18f, 0.35f), 4, Swatch.FurDark, Swatch.FurDark);
             }
 
-            // Туловище наклонено вперёд; рёбра спереди, позвонки сзади.
-            k.Push(new Vector3(0f, 1.05f, 0f), new Vector3(28f, 0f, 0f));
-            k.Frustum(Vector3.zero, new Vector2(0.36f, 0.24f), new Vector2(0.52f, 0.3f), 0.8f, Swatch.Skin, Swatch.SkinPale);
-            for (int rib = 0; rib < 4; rib++)
-                k.Box(new Vector3(0f, 0.35f + rib * 0.1f, 0.135f + rib * 0.006f), new Vector3(0.36f + rib * 0.03f, 0.025f, 0.02f), Swatch.SkinDark);
-            for (int vertebra = 0; vertebra < 6; vertebra++)
-                k.Box(new Vector3(0f, 0.1f + vertebra * 0.12f, -0.13f - vertebra * 0.004f), new Vector3(0.05f, 0.05f, 0.04f), Swatch.SkinDark);
-            k.Pop();
-
-            k.Limb(new Vector3(0f, 1.74f, 0.36f), new Vector3(0f, 1.95f, 0.5f), 0.08f, 0.07f, 6, Swatch.Skin);
+            foreach (var (position, radius) in new[] { (new Vector3(0.62f, 0.9f, -0.2f), 0.18f), (new Vector3(-0.58f, 0.7f, 0.3f), 0.14f), (new Vector3(0.5f, 1.1f, -0.75f), 0.12f) })
+                k.Ellipsoid(position, Quaternion.identity, Vector3.one * radius, 4, 6, new[] { Swatch.Skin, Swatch.SkinPale, Swatch.NoseDark }, random, 0.1f);
         }
 
-        /// <summary>Голова Слепыша: вытянутая, без глаз (только зарубцованные щели), с пастью.</summary>
-        public static void BlindOneHead(MeshKit k)
+        /// <summary>Голова (опорная точка — шея): щёки, круглые уши, заросшие кожей глазницы, длинные резцы, усы.</summary>
+        public static void BlindOneHead(MeshKit k, System.Random random)
         {
-            // Череп спереди наклонён: передняя грань от z = 0.07 внизу до z = 0.01 вверху.
-            k.Frustum(new Vector3(0f, -0.15f, -0.1f), new Vector2(0.26f, 0.34f), new Vector2(0.2f, 0.22f), 0.3f, Swatch.Skin, Swatch.SkinPale);
-            k.Box(new Vector3(0f, -0.07f, 0.12f), new Vector3(0.18f, 0.14f, 0.24f), Swatch.Skin);
-            k.Box(new Vector3(0f, -0.11f, 0.241f), new Vector3(0.14f, 0.025f, 0.01f), Swatch.Mouth);
-            for (int tooth = -2; tooth <= 1; tooth++)
-                k.Box(new Vector3(0.0175f + tooth * 0.035f, -0.095f, 0.246f), new Vector3(0.012f, 0.02f, 0.01f), Swatch.White);
+            var lengthwise = Quaternion.Euler(90f, 0f, 0f);
+            k.Ellipsoid(new Vector3(0f, 0.02f, 0.32f), lengthwise, new Vector3(0.5f, 0.5f, 0.46f), 6, 10, PatchyFur, random, 0.05f);
             foreach (float side in new[] { -1f, 1f })
-                k.Box(new Vector3(0.06f * side, 0.03f, 0.045f), new Vector3(0.06f, 0.012f, 0.02f), Swatch.SkinDark);
+            {
+                k.Ellipsoid(new Vector3(0.25f * side, -0.12f, 0.48f), Quaternion.identity, new Vector3(0.22f, 0.2f, 0.24f), 4, 8, new[] { Swatch.FurPale, Swatch.FurPale, Swatch.Fur }, random, 0.04f);
+                // Уши — круглые лопухи, чуть опущенные наружу.
+                k.Ellipsoid(new Vector3(0.32f * side, 0.32f, 0.12f), Quaternion.Euler(0f, 0f, -35f * side), new Vector3(0.17f, 0.04f, 0.14f), 3, 8, new[] { Swatch.NoseDark, Swatch.SkinPale }, random);
+                // На месте глаз — затянутые кожей впадины.
+                k.Ellipsoid(new Vector3(0.34f * side, 0.12f, 0.5f), Quaternion.Euler(0f, 30f * side, 0f), new Vector3(0.09f, 0.06f, 0.03f), 3, 6, new[] { Swatch.SkinDark }, random);
+                // Усы.
+                for (int w = 0; w < 3; w++)
+                {
+                    var root = new Vector3(0.14f * side, -0.08f - w * 0.03f, 0.72f);
+                    k.Limb(root, root + new Vector3(0.45f * side, Range(random, -0.12f, 0.06f), Range(random, 0f, 0.15f)), 0.01f, 0.004f, 3, Swatch.Claw);
+                }
+            }
+            k.Box(new Vector3(0f, -0.24f, 0.74f), new Vector3(0.18f, 0.03f, 0.05f), Swatch.Mouth);
+            foreach (float side in new[] { -1f, 1f })
+                k.Box(new Vector3(0.032f * side, -0.3f, 0.76f), new Vector3(0.055f, 0.13f, 0.03f), Swatch.Teeth);
+        }
+
+        /// <summary>Звёздчатый нос: розовый диск и 22 мясистых щупальца по кругу. Опорная точка — основание носа.</summary>
+        public static void BlindOneNoseStar(MeshKit k)
+        {
+            k.Cylinder(new Vector3(0f, 0f, -0.04f), Quaternion.Euler(90f, 0f, 0f), 0.1f, 0.095f, 0.07f, 10, Swatch.NoseDark, Swatch.NosePink);
+            foreach (float side in new[] { -1f, 1f })
+                k.Box(new Vector3(0.03f * side, 0f, 0.032f), new Vector3(0.025f, 0.035f, 0.01f), Swatch.Mouth);
+
+            const int tentacles = 22;
+            for (int i = 0; i < tentacles; i++)
+            {
+                float angle = 2f * Mathf.PI * (i + 0.5f) / tentacles;
+                var outward = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+                var root = outward * 0.085f + Vector3.forward * 0.02f;
+                // Нижние щупальца короче, как у настоящего звездоноса.
+                float length = Mathf.Lerp(0.13f, 0.2f, (outward.y + 1f) / 2f);
+                k.Limb(root, root + outward * length + Vector3.forward * 0.07f, 0.032f, 0.012f, 4, Swatch.NosePink);
+            }
+        }
+
+        /// <summary>Короткая толстая лапа с когтями. Опорная точка — бедро/плечо, лапа на земле в 0.45 ниже.</summary>
+        public static void BlindOneLeg(MeshKit k, System.Random random)
+        {
+            k.Limb(Vector3.zero, new Vector3(0f, -0.33f, 0.04f), 0.17f, 0.12f, 6, random.NextDouble() < 0.5 ? Swatch.FurDark : Swatch.Fur);
+            k.Box(new Vector3(0f, -0.41f, 0.08f), new Vector3(0.22f, 0.08f, 0.28f), Swatch.SkinDark);
+            for (int claw = 0; claw < 4; claw++)
+            {
+                var root = new Vector3(-0.075f + claw * 0.05f, -0.41f, 0.21f);
+                k.Limb(root, root + new Vector3(0f, -0.035f, 0.09f), 0.018f, 0f, 4, Swatch.Claw);
+            }
         }
 
         // ---------- Предметы ----------

@@ -76,21 +76,11 @@ namespace Nuclear.Level
                 panelObstacle = panel.GetComponent<NavMeshObstacle>();
             }
 
-            rumble = gameObject.AddComponent<AudioSource>();
+            rumble = SoundSources.Create3D(gameObject, maxDistance: 40f);
             rumble.clip = ProceduralAudio.Rumble;
             rumble.loop = true;
-            rumble.spatialBlend = 1f;
-            rumble.rolloffMode = AudioRolloffMode.Linear;
-            rumble.minDistance = 2f;
-            rumble.maxDistance = 40f;
-            rumble.playOnAwake = false;
 
-            sfx = gameObject.AddComponent<AudioSource>();
-            sfx.spatialBlend = 1f;
-            sfx.rolloffMode = AudioRolloffMode.Linear;
-            sfx.minDistance = 2f;
-            sfx.maxDistance = 50f;
-            sfx.playOnAwake = false;
+            sfx = SoundSources.Create3D(gameObject, maxDistance: 50f);
         }
 
         public override void OnNetworkSpawn()

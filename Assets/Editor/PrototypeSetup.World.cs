@@ -331,6 +331,8 @@ namespace Nuclear.EditorTools
             lamp.intensity = 1.6f;
             lamp.range = 9f;
 
+            AddRoomEcho(bunker.transform, new Vector3(0f, 1.5f, 0f), 5f, 8f);
+
             var airlock = new GameObject("Airlock (safe air)");
             airlock.transform.SetParent(level, false);
             airlock.transform.localPosition = new Vector3(0f, 2f, 0f);
@@ -384,6 +386,8 @@ namespace Nuclear.EditorTools
             lamp.intensity = 1.3f;
             lamp.range = 7f;
 
+            AddRoomEcho(bunker.transform, new Vector3(0f, 1.5f, 3f), 3f, 5f);
+
             var goal = new GameObject("Goal (inside Bunker-12)");
             goal.transform.SetParent(bunker.transform, false);
             goal.transform.localPosition = new Vector3(0f, 1.5f, 3.2f);
@@ -395,6 +399,17 @@ namespace Nuclear.EditorTools
             air.AddComponent<SafeAirZone>().Configure(new Vector3(5.6f, 3.5f, 5f));
 
             blockedRects.Add(new Rect(-8f, 20f, 16f, 11f));
+        }
+
+        /// <summary>Эхо бетонной комнаты: все звуки внутри бункера звучат гулко.</summary>
+        private static void AddRoomEcho(Transform parent, Vector3 position, float minDistance, float maxDistance)
+        {
+            var echo = new GameObject("Room Echo").AddComponent<AudioReverbZone>();
+            echo.transform.SetParent(parent, false);
+            echo.transform.localPosition = position;
+            echo.reverbPreset = AudioReverbPreset.Stoneroom;
+            echo.minDistance = minDistance;
+            echo.maxDistance = maxDistance;
         }
 
         /// <summary>

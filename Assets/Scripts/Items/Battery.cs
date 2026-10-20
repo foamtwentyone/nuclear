@@ -41,11 +41,7 @@ namespace Nuclear.Items
                 indicator = indicatorTransform.GetComponent<Renderer>();
             indicatorBlock = new MaterialPropertyBlock();
 
-            sparkSource = gameObject.AddComponent<AudioSource>();
-            sparkSource.spatialBlend = 1f;
-            sparkSource.rolloffMode = AudioRolloffMode.Linear;
-            sparkSource.maxDistance = 20f;
-            sparkSource.playOnAwake = false;
+            sparkSource = SoundSources.Create3D(gameObject, maxDistance: 20f);
         }
 
         public override void OnNetworkSpawn()

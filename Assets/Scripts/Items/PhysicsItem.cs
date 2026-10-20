@@ -19,7 +19,8 @@ namespace Nuclear.Items
         public enum ImpactSound : byte
         {
             Wood,
-            Metal,
+            /// <summary>Тяжёлый глухой удар (аккумулятор).</summary>
+            Heavy,
             Tin,
         }
 
@@ -74,12 +75,7 @@ namespace Nuclear.Items
             body = GetComponent<Rigidbody>();
             colliders = GetComponentsInChildren<Collider>();
 
-            impactSource = gameObject.AddComponent<AudioSource>();
-            impactSource.spatialBlend = 1f;
-            impactSource.rolloffMode = AudioRolloffMode.Linear;
-            impactSource.minDistance = 1f;
-            impactSource.maxDistance = 25f;
-            impactSource.playOnAwake = false;
+            impactSource = SoundSources.Create3D(gameObject, maxDistance: 25f);
         }
 
         public override void OnNetworkSpawn()
@@ -194,7 +190,7 @@ namespace Nuclear.Items
         {
             var clip = impactSound switch
             {
-                ImpactSound.Metal => ProceduralAudio.ImpactMetal,
+                ImpactSound.Heavy => ProceduralAudio.ImpactHeavy,
                 ImpactSound.Tin => ProceduralAudio.ImpactTin,
                 _ => ProceduralAudio.ImpactWood,
             };

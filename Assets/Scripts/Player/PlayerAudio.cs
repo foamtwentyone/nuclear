@@ -52,9 +52,9 @@ namespace Nuclear.Player
             survival = GetComponent<PlayerSurvival>();
             carry = GetComponent<PlayerCarry>();
 
-            feet = CreateSource(spatial: true, maxDistance: 20f);
-            body = CreateSource(spatial: true, maxDistance: 15f);
-            personal = CreateSource(spatial: false, maxDistance: 1f);
+            feet = SoundSources.Create3D(gameObject, maxDistance: 20f);
+            body = SoundSources.Create3D(gameObject, maxDistance: 15f);
+            personal = SoundSources.Create2D(gameObject);
             lastPosition = transform.position;
         }
 
@@ -180,17 +180,6 @@ namespace Nuclear.Player
         {
             if (controller.IsOwner && current > previous)
                 personal.PlayOneShot(ProceduralAudio.Pickup, 0.7f);
-        }
-
-        private AudioSource CreateSource(bool spatial, float maxDistance)
-        {
-            var source = gameObject.AddComponent<AudioSource>();
-            source.spatialBlend = spatial ? 1f : 0f;
-            source.rolloffMode = AudioRolloffMode.Linear;
-            source.minDistance = 1f;
-            source.maxDistance = maxDistance;
-            source.playOnAwake = false;
-            return source;
         }
     }
 }

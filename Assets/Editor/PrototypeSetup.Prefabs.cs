@@ -138,7 +138,7 @@ namespace Nuclear.EditorTools
                 ["soloSpeedMultiplier"] = 0.45f,
                 ["sharedSpeedMultiplier"] = 0.85f,
                 ["canThrow"] = false,
-                ["impactSound"] = PhysicsItem.ImpactSound.Metal,
+                ["impactSound"] = PhysicsItem.ImpactSound.Heavy,
                 ["impactNoiseRadius"] = 15f,
             });
             root.AddComponent<Battery>();
@@ -269,10 +269,12 @@ namespace Nuclear.EditorTools
 
             var body = root.AddComponent<Rigidbody>();
             body.isKinematic = true;
+            // Длинное круглое тело: капсула вдоль Z.
             var capsule = root.AddComponent<CapsuleCollider>();
-            capsule.center = new Vector3(0f, 1.15f, 0f);
-            capsule.height = 2.3f;
-            capsule.radius = 0.4f;
+            capsule.direction = 2;
+            capsule.center = new Vector3(0f, 0.8f, 0.25f);
+            capsule.height = 3.1f;
+            capsule.radius = 0.66f;
 
             root.AddComponent<NetworkObject>();
             var netTransform = root.AddComponent<NetworkTransform>();
@@ -282,16 +284,31 @@ namespace Nuclear.EditorTools
             netTransform.SyncScaleY = false;
             netTransform.SyncScaleZ = false;
 
+            // Части отдельно, чтобы BlindOneAnimator мог их двигать.
+            var random = new System.Random(13);
             var bodyKit = new MeshKit();
-            Models.BlindOneBody(bodyKit);
-            AddModel(root.transform, "BlindOne Body", bodyKit, Vector3.zero, Quaternion.identity);
+            Models.BlindOneBody(bodyKit, random);
+            AddModel(root.transform, "Body", bodyKit, Vector3.zero, Quaternion.identity);
 
-            // Голова отдельным объектом: её оттенок показывает состояние (см. BlindOne.UpdateHeadColor).
+            // Голова отдельным объектом ещё и потому, что её оттенок показывает состояние (см. BlindOne.UpdateHeadColor).
             var headKit = new MeshKit();
-            Models.BlindOneHead(headKit);
-            AddModel(root.transform, "Head", headKit, new Vector3(0f, 2.02f, 0.56f), Quaternion.identity);
+            Models.BlindOneHead(headKit, random);
+            var head = AddModel(root.transform, "Head", headKit, Models.BlindOneNeck, Quaternion.identity);
+
+            var noseKit = new MeshKit();
+            Models.BlindOneNoseStar(noseKit);
+            AddModel(head.transform, "Nose", noseKit, Models.BlindOneNose, Quaternion.identity);
+
+            // Порядок лап: передняя левая, передняя правая, задняя левая, задняя правая.
+            for (int i = 0; i < Models.BlindOneHips.Length; i++)
+            {
+                var legKit = new MeshKit();
+                Models.BlindOneLeg(legKit, random);
+                AddModel(root.transform, $"Leg {i}", legKit, Models.BlindOneHips[i], Quaternion.identity);
+            }
 
             root.AddComponent<BlindOne>();
+            root.AddComponent<BlindOneAnimator>();
 
             return SavePrefab(root, "BlindOne");
         }

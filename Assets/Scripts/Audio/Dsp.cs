@@ -17,9 +17,6 @@ namespace Nuclear.Audio
 
         public static float White(System.Random random) => (float)(random.NextDouble() * 2.0 - 1.0);
 
-        /// <summary>Пила от -1 до 1; фаза в периодах.</summary>
-        public static float Saw(double phase) => (float)(2.0 * (phase - Math.Floor(phase + 0.5)));
-
         public static float Sine(double phase) => (float)Math.Sin(phase * 2.0 * Math.PI);
 
         /// <summary>Быстрая атака и экспоненциальный спад; ноль до начала.</summary>
@@ -73,6 +70,162 @@ namespace Nuclear.Audio
                 loop[i] = loop[i] * k + data[loop.Length + i] * (1f - k);
             }
             return loop;
+        }
+
+        /// <summary>
+        /// Розовый шум (метод Пола Келлета): мягче белого, энергия падает к высоким частотам,
+        /// как у большинства природных шумов — ветра, дыхания, шороха.
+        /// </summary>
+        public sealed class PinkNoise
+        {
+            private readonly System.Random random;
+            private float b0, b1, b2;
+
+            public PinkNoise(int seed) => random = new System.Random(seed);
+
+            public float Next()
+            {
+                float white = White(random);
+                b0 = 0.99765f * b0 + white * 0.0990460f;
+                b1 = 0.96300f * b1 + white * 0.2965164f;
+                b2 = 0.57000f * b2 + white * 1.0526913f;
+                return (b0 + b1 + b2 + white * 0.1848f) * 0.25f;
+            }
+        }
+
+        /// <summary>
+        /// Пила без цифровых призвуков (PolyBLEP): сглаживает скачок формы волны,
+        /// поэтому высокие тона не звенят «металлическим» отражением частот.
+        /// </summary>
+        public sealed class Saw
+        {
+            private double phase;
+
+            public float Next(float frequency)
+            {
+                double step = frequency / SampleRate;
+                phase += step;
+                if (phase >= 1.0)
+                    phase -= 1.0;
+                double value = 2.0 * phase - 1.0;
+                value -= PolyBlep(phase, step);
+                return (float)value;
+            }
+
+            private static double PolyBlep(double t, double dt)
+            {
+                if (t < dt)
+                {
+                    t /= dt;
+                    return t + t - t * t - 1.0;
+                }
+                if (t > 1.0 - dt)
+                {
+                    t = (t - 1.0) / dt;
+                    return t * t + t + t + 1.0;
+                }
+                return 0.0;
+            }
+        }
+
+        /// <summary>Затухающая синусоида — «зерно» для хруста, щелчков и звона.</summary>
+        public static void AddGrain(float[] data, float start, float frequency, float decay, float amplitude)
+        {
+            int first = Mathf.Max(0, Mathf.RoundToInt(start * SampleRate));
+            int length = Mathf.Min(data.Length - first, Mathf.CeilToInt(decay * 6f * SampleRate));
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)SampleRate;
+                data[first + i] += Mathf.Sin(2f * Mathf.PI * frequency * t) * Mathf.Exp(-t / decay) * amplitude;
+            }
+        }
+
+        /// <summary>
+        /// Удар по предмету как набор собственных частот (модальный синтез): у каждой частоты свои громкость и затухание.
+        /// Небольшой случайный сдвиг частот делает каждый клип чуть живее.
+        /// </summary>
+        public static void AddModes(float[] data, float start, float[] frequencies, float[] amplitudes, float[] decays, float gain, System.Random random)
+        {
+            for (int m = 0; m < frequencies.Length; m++)
+            {
+                float detune = 1f + (float)(random.NextDouble() - 0.5) * 0.02f;
+                AddGrain(data, start, frequencies[m] * detune, decays[m], amplitudes[m] * gain);
+            }
+        }
+
+        public static void Filter(float[] data, Biquad filter)
+        {
+            for (int i = 0; i < data.Length; i++)
+                data[i] = filter.Process(data[i]);
+        }
+
+        /// <summary>
+        /// Реверберация в духе Freeverb: четыре гребенчатых фильтра с затуханием высоких и два всепропускающих.
+        /// Буфер удлиняется на хвост. room — размер «комнаты» (0..1), wet — доля отражений.
+        /// </summary>
+        public static float[] Reverb(float[] data, float tailSeconds, float room, float wet, float damping = 0.4f)
+        {
+            int[] combDelays = { 1116, 1188, 1277, 1356 };
+            int[] allpassDelays = { 556, 441 };
+            float feedback = 0.7f + room * 0.28f;
+
+            var output = new float[data.Length + Mathf.CeilToInt(tailSeconds * SampleRate)];
+            var combs = new float[4][];
+            var combIndex = new int[4];
+            var combStore = new float[4];
+            for (int c = 0; c < 4; c++)
+                combs[c] = new float[combDelays[c]];
+            var allpasses = new float[2][];
+            var allpassIndex = new int[2];
+            for (int a = 0; a < 2; a++)
+                allpasses[a] = new float[allpassDelays[a]];
+
+            for (int i = 0; i < output.Length; i++)
+            {
+                float input = i < data.Length ? data[i] : 0f;
+                float sum = 0f;
+                for (int c = 0; c < 4; c++)
+                {
+                    float delayed = combs[c][combIndex[c]];
+                    combStore[c] = delayed * (1f - damping) + combStore[c] * damping;
+                    combs[c][combIndex[c]] = input * 0.25f + combStore[c] * feedback;
+                    combIndex[c] = (combIndex[c] + 1) % combs[c].Length;
+                    sum += delayed;
+                }
+                for (int a = 0; a < 2; a++)
+                {
+                    float delayed = allpasses[a][allpassIndex[a]];
+                    allpasses[a][allpassIndex[a]] = sum + delayed * 0.5f;
+                    allpassIndex[a] = (allpassIndex[a] + 1) % allpasses[a].Length;
+                    sum = delayed - sum;
+                }
+                output[i] = input * (1f - wet) + sum * wet;
+            }
+
+            // Хвост плавно уходит в ноль, чтобы клип не обрывался щелчком.
+            int fade = Mathf.Min(output.Length, SampleRate / 10);
+            for (int i = 0; i < fade; i++)
+                output[output.Length - 1 - i] *= i / (float)fade;
+            return output;
+        }
+
+        /// <summary>Стереоклип из двух каналов одинаковой длины (для фона, звучащего «вокруг»).</summary>
+        public static AudioClip ToStereoClip(string name, float[] left, float[] right, float peak = 0.9f)
+        {
+            float max = 0f;
+            for (int i = 0; i < left.Length; i++)
+                max = Mathf.Max(max, Mathf.Max(Mathf.Abs(left[i]), Mathf.Abs(right[i])));
+            float gain = max > 0f ? peak / max : 1f;
+
+            var interleaved = new float[left.Length * 2];
+            for (int i = 0; i < left.Length; i++)
+            {
+                interleaved[i * 2] = left[i] * gain;
+                interleaved[i * 2 + 1] = right[i] * gain;
+            }
+            var clip = AudioClip.Create(name, left.Length, 2, SampleRate, false);
+            clip.SetData(interleaved, 0);
+            return clip;
         }
 
         public static AudioClip ToClip(string name, float[] data, float peak = 0.9f)
