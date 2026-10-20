@@ -8,7 +8,7 @@ Shader "Nuclear/Outline"
     Properties
     {
         _Color ("Color", Color) = (0.06, 0.05, 0.05, 1)
-        _Width ("Width per metre of distance", Float) = 0.0035
+        _Width ("Width per metre of distance", Float) = 0.005
         _MaxDistance ("Width stops growing after (m)", Float) = 18
     }
     SubShader

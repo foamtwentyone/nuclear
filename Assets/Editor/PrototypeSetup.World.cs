@@ -47,7 +47,10 @@ namespace Nuclear.EditorTools
 
             BuildLighting();
             if (UsingUrp)
+            {
+                CallUrp("PrepareRenderer");
                 CallUrp("AddPostProcessing");
+            }
 
             // Камера-заглушка, пока игрок не заспавнился: вид на шлюз со стороны дороги.
             var menuCamera = new GameObject("Menu Camera").AddComponent<Camera>();

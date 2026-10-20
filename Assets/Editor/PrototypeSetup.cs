@@ -145,6 +145,8 @@ namespace Nuclear.EditorTools
                 AssetDatabase.CreateAsset(material, path);
             }
             material.shader = shader;
+            // Толщина задаётся здесь, а не в инспекторе: материал пересоздаётся при каждой сборке.
+            material.SetFloat("_Width", 0.005f);
             EditorUtility.SetDirty(material);
             return material;
         }

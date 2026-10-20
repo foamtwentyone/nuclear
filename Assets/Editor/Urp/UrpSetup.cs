@@ -26,6 +26,7 @@ namespace Nuclear.EditorTools.Urp
 
             var renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
             AssetDatabase.CreateAsset(renderer, rendererPath);
+            PrepareRenderer(renderer);
             AddRendererFeature<ScreenSpaceAmbientOcclusion>(renderer, "Ambient Occlusion");
 
             var pipeline = UniversalRenderPipelineAsset.Create(renderer);
@@ -45,6 +46,26 @@ namespace Nuclear.EditorTools.Urp
             }
             QualitySettings.SetQualityLevel(current, false);
 
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>Настраивает рендерер, созданный раньше (вызывается при каждой сборке сцены под URP).</summary>
+        public static void PrepareRenderer()
+        {
+            var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(Folder + "/Nuclear Renderer.asset");
+            if (renderer != null)
+                PrepareRenderer(renderer);
+        }
+
+        /// <summary>
+        /// Отключает Depth Priming. С ним (а SSAO его включает в режиме Auto) URP рисует непрозрачное
+        /// только там, где глубина совпала с предварительным проходом. Оболочки контуров в этот проход
+        /// не попадают и целиком отсекаются — обводки пропадают.
+        /// </summary>
+        private static void PrepareRenderer(UniversalRendererData renderer)
+        {
+            renderer.depthPrimingMode = DepthPrimingMode.Disabled;
+            EditorUtility.SetDirty(renderer);
             AssetDatabase.SaveAssets();
         }
 
