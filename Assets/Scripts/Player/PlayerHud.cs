@@ -120,7 +120,9 @@ namespace Nuclear.Player
                 return;
 
             string hint = null;
-            if (carry.HeldItem is { } held)
+            var held = carry.HeldItem;
+            var target = carry.LookTarget;
+            if (held != null)
             {
                 hint = $"{held.DisplayName}{ChargeText(held)}: E — отпустить";
                 if (held.CanThrow)
@@ -130,7 +132,7 @@ namespace Nuclear.Player
                 else if (!held.IsFull && carry.IsHeavyLoad)
                     hint += "\nТяжело. Позови помощь";
             }
-            else if (carry.LookTarget is { } target)
+            else if (target != null)
             {
                 if (target.IsFull)
                     hint = $"{target.DisplayName}{ChargeText(target)}: уже несут";

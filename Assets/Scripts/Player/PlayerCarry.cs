@@ -22,15 +22,32 @@ namespace Nuclear.Player
 
         public PlayerController Controller { get; private set; }
 
-        /// <summary>Предмет, на который смотрит свой игрок (для подсказок).</summary>
-        public PhysicsItem LookTarget { get; private set; }
+        /// <summary>
+        /// Предмет, на который смотрит свой игрок (для подсказок).
+        /// Предмет могут уничтожить посреди кадра (например, фильтр ушёл в карман),
+        /// поэтому уничтоженный возвращается как настоящий null.
+        /// </summary>
+        public PhysicsItem LookTarget
+        {
+            get => lookTarget != null ? lookTarget : null;
+            private set => lookTarget = value;
+        }
 
-        public PhysicsItem HeldItem =>
-            heldItemId.Value != NoItem
-            && NetworkManager != null
-            && NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(heldItemId.Value, out var heldObject)
-                ? heldObject.GetComponent<PhysicsItem>()
-                : null;
+        private PhysicsItem lookTarget;
+
+        public PhysicsItem HeldItem
+        {
+            get
+            {
+                if (heldItemId.Value == NoItem || NetworkManager == null
+                    || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(heldItemId.Value, out var heldObject)
+                    || heldObject == null)
+                    return null;
+
+                var item = heldObject.GetComponent<PhysicsItem>();
+                return item != null ? item : null;
+            }
+        }
 
         public float SpeedMultiplier => HeldItem is { } item ? item.SpeedMultiplier : 1f;
         public bool IsHeavyLoad => SpeedMultiplier < heavyThreshold;
