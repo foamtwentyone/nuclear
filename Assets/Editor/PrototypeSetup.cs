@@ -35,6 +35,7 @@ namespace Nuclear.EditorTools
         /// <summary>Материал с процедурной текстурой для каждого цвета палитры.</summary>
         private static readonly Dictionary<Swatch, Material> surfaceMaterials = new();
         private static Material glowMaterial;
+        private static Material outlineMaterial;
 
         [MenuItem("Nuclear/Собрать сцену прототипа")]
         public static void Build()
@@ -123,6 +124,29 @@ namespace Nuclear.EditorTools
             }
 
             glowMaterial = SaveMaterial("Toxic Glow", new Color(0.55f, 1f, 0.35f), emission: new Color(0.6f, 1.6f, 0.3f));
+            outlineMaterial = SaveOutlineMaterial();
+        }
+
+        /// <summary>Материал мультяшного контура (Assets/Shaders/Outline.shader). Без шейдера контуров просто не будет.</summary>
+        private static Material SaveOutlineMaterial()
+        {
+            var shader = Shader.Find("Nuclear/Outline");
+            if (shader == null)
+            {
+                Debug.LogWarning("Шейдер Nuclear/Outline не найден — контуры не добавлены.");
+                return null;
+            }
+
+            string path = $"{MaterialFolder}/Outline.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, path);
+            }
+            material.shader = shader;
+            EditorUtility.SetDirty(material);
+            return material;
         }
 
         private static Texture2D SaveTexture(string path, Color[] pixels, int size, bool linear)
@@ -226,8 +250,11 @@ namespace Nuclear.EditorTools
             return mesh;
         }
 
-        /// <summary>Дочерний объект с low-poly моделью и её коллайдерами-коробками.</summary>
-        private static GameObject AddModel(Transform parent, string name, MeshKit kit, Vector3 position, Quaternion rotation, Material material = null, float scale = 1f)
+        /// <summary>
+        /// Дочерний объект с low-poly моделью и её коллайдерами-коробками.
+        /// outline — добавить мультяшный контур (не нужен земле, дороге, траве и светящимся деталям).
+        /// </summary>
+        private static GameObject AddModel(Transform parent, string name, MeshKit kit, Vector3 position, Quaternion rotation, Material material = null, float scale = 1f, bool outline = true)
         {
             var model = new GameObject(name);
             model.transform.SetParent(parent, false);
@@ -241,7 +268,29 @@ namespace Nuclear.EditorTools
                 materials[i] = material != null ? material : surfaceMaterials[swatches[i]];
             model.AddComponent<MeshRenderer>().sharedMaterials = materials;
             AddBoxColliders(model, kit.Colliders);
+
+            if (outline && material == null && outlineMaterial != null)
+                AddOutline(model, kit, name);
             return model;
+        }
+
+        /// <summary>
+        /// Контур — отдельный дочерний меш (оболочка с усреднёнными нормалями) с шейдером Nuclear/Outline.
+        /// Дочерний, чтобы двигаться вместе с моделью и прятаться вместе с ней (тело своего игрока).
+        /// </summary>
+        private static void AddOutline(GameObject model, MeshKit kit, string name)
+        {
+            var mesh = kit.ToOutlineMesh(name + " Outline");
+            AssetDatabase.CreateAsset(mesh, AssetDatabase.GenerateUniqueAssetPath($"{MeshFolder}/{name} Outline.asset"));
+
+            var outline = new GameObject("Outline");
+            outline.transform.SetParent(model.transform, false);
+            outline.isStatic = model.isStatic;
+            outline.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = outline.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = outlineMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
         }
 
         private static void AddBoxColliders(GameObject owner, List<BoxShape> shapes)

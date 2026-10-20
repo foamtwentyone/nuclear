@@ -39,6 +39,16 @@ namespace Nuclear.EditorTools.LowPoly
 
         public int TriangleCount => triangles.Count / 3;
 
+        /// <summary>
+        /// Соседние грани с углом меньше этого сглаживаются (как Smoothing Angle при импорте моделей):
+        /// круглые детали выглядят гладкими, а углы коробок и стен остаются острыми.
+        /// </summary>
+        public float SmoothingAngle = 50f;
+
+        /// <summary>Во сколько раз больше граней у круглых деталей, чем задано в рецепте (тонкие травинки не трогаем).</summary>
+        private const int RoundDetail = 2;
+        private const int MaxSides = 28;
+
         public void Push(Vector3 position, Quaternion rotation, float scale = 1f)
         {
             stack.Push(matrix);
@@ -149,6 +159,8 @@ namespace Nuclear.EditorTools.LowPoly
         /// </summary>
         public void Cylinder(Vector3 baseCenter, Quaternion rotation, float radius, float topRadius, float height, int sides, Swatch swatch, Swatch caps)
         {
+            if (Mathf.Max(radius, topRadius) >= 0.03f)
+                sides = Mathf.Min(MaxSides, sides * RoundDetail);
             Push(baseCenter, rotation);
 
             var bottomRing = new Vector3[sides];
@@ -185,6 +197,10 @@ namespace Nuclear.EditorTools.LowPoly
         /// </summary>
         public void Ellipsoid(Vector3 center, Quaternion rotation, Vector3 radii, int rings, int sides, Swatch[] swatches, System.Random random, float jitter = 0f)
         {
+            rings *= RoundDetail;
+            sides = Mathf.Min(MaxSides, sides * RoundDetail);
+            // При удвоенной сетке та же бугристость выглядела бы рябью — уменьшаем.
+            jitter /= RoundDetail;
             var points = new Vector3[rings + 1, sides];
             for (int r = 0; r <= rings; r++)
             {
@@ -199,13 +215,17 @@ namespace Nuclear.EditorTools.LowPoly
                 }
             }
 
+            // Пятна цвета — плавная функция точки на сфере, поэтому соседние грани
+            // складываются в крупные пятна шерсти, а не в шахматку.
+            float phase = Range(random, 0f, 100f);
             Push(center, rotation);
             for (int r = 0; r < rings; r++)
             {
                 for (int s = 0; s < sides; s++)
                 {
                     int next = (s + 1) % sides;
-                    var swatch = swatches[random.Next(swatches.Length)];
+                    Vector3 middle = (points[r, s] + points[r + 1, next]) * 0.5f;
+                    var swatch = swatches[PatchIndex(Vector3.Scale(middle, new Vector3(1f / radii.x, 1f / radii.y, 1f / radii.z)), phase, swatches.Length)];
                     // У полюсов четырёхугольник вырождается в треугольник: рисуем только непустой.
                     if (r == 0)
                         Triangle(points[0, s], points[1, s], points[1, next], swatch);
@@ -216,6 +236,24 @@ namespace Nuclear.EditorTools.LowPoly
                 }
             }
             Pop();
+        }
+
+        /// <summary>Индекс цвета для точки единичной сферы: плавные пятна размером с треть окружности.</summary>
+        private static int PatchIndex(Vector3 direction, float phase, int count)
+        {
+            float wave = Mathf.Sin(direction.x * 3.1f + phase) * Mathf.Sin(direction.y * 2.3f + phase * 1.7f) * Mathf.Sin(direction.z * 2.7f + phase * 0.5f)
+                + 0.5f * Mathf.Sin(direction.x * 5.3f - direction.z * 4.1f + phase * 2.3f);
+            float t = Mathf.Clamp01(wave / 1.5f * 0.5f + 0.5f);
+            return Mathf.Min(count - 1, Mathf.FloorToInt(t * count));
+        }
+
+        /// <summary>Скруглённый цилиндр между двумя точками (конечность): цилиндр и полусферы на концах.</summary>
+        public void Capsule(Vector3 from, Vector3 to, float radius, Swatch swatch, System.Random random)
+        {
+            Limb(from, to, radius, radius, 8, swatch);
+            var single = new[] { swatch };
+            Ellipsoid(from, Quaternion.identity, Vector3.one * radius, 4, 8, single, random);
+            Ellipsoid(to, Quaternion.identity, Vector3.one * radius, 4, 8, single, random);
         }
 
         /// <summary>Цилиндр между двумя точками — для веток, арматуры, проводов, конечностей.</summary>
@@ -267,11 +305,99 @@ namespace Nuclear.EditorTools.LowPoly
             for (int i = 0; i < order.Count; i++)
                 mesh.SetTriangles(groups[order[i]], i);
             swatches = order.ToArray();
-            mesh.RecalculateNormals();
+            mesh.SetNormals(SmoothedNormals());
             mesh.RecalculateBounds();
             mesh.RecalculateTangents();
             return mesh;
         }
+
+        /// <summary>
+        /// Меш для контура: вершины в одной точке склеены, нормали усреднены по всем граням вокруг.
+        /// Шейдер контура выдавливает оболочку вдоль этих нормалей; без склейки на острых углах
+        /// оболочка разошлась бы щелями.
+        /// </summary>
+        public Mesh ToOutlineMesh(string name)
+        {
+            var index = new Dictionary<Vector3Int, int>();
+            var positions = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var outlineTriangles = new List<int>(triangles.Count);
+
+            for (int t = 0; t < triangles.Count; t += 3)
+            {
+                Vector3 a = vertices[triangles[t]], b = vertices[triangles[t + 1]], c = vertices[triangles[t + 2]];
+                Vector3 faceNormal = Vector3.Cross(b - a, c - a); // длина = удвоенная площадь, крупные грани весят больше
+                foreach (var corner in new[] { a, b, c })
+                {
+                    var key = Key(corner);
+                    if (!index.TryGetValue(key, out int welded))
+                    {
+                        welded = positions.Count;
+                        index.Add(key, welded);
+                        positions.Add(corner);
+                        normals.Add(Vector3.zero);
+                    }
+                    normals[welded] += faceNormal;
+                    outlineTriangles.Add(welded);
+                }
+            }
+            for (int i = 0; i < normals.Count; i++)
+                normals[i] = normals[i].normalized;
+
+            var mesh = new Mesh { name = name };
+            if (positions.Count > 65000)
+                mesh.indexFormat = IndexFormat.UInt32;
+            mesh.SetVertices(positions);
+            mesh.SetNormals(normals);
+            mesh.SetTriangles(outlineTriangles, 0);
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        /// <summary>
+        /// Нормали с порогом сглаживания: вершина берёт среднее нормалей граней, сходящихся в её точке,
+        /// но только тех, что повёрнуты не больше чем на SmoothingAngle от её собственной грани.
+        /// </summary>
+        private List<Vector3> SmoothedNormals()
+        {
+            var faceNormals = new Vector3[triangles.Count / 3];
+            var byPosition = new Dictionary<Vector3Int, List<int>>();
+            for (int f = 0; f < faceNormals.Length; f++)
+            {
+                Vector3 a = vertices[triangles[f * 3]], b = vertices[triangles[f * 3 + 1]], c = vertices[triangles[f * 3 + 2]];
+                faceNormals[f] = Vector3.Cross(b - a, c - a);
+                for (int corner = 0; corner < 3; corner++)
+                {
+                    var key = Key(vertices[triangles[f * 3 + corner]]);
+                    if (!byPosition.TryGetValue(key, out var faces))
+                        byPosition.Add(key, faces = new List<int>());
+                    faces.Add(f);
+                }
+            }
+
+            float threshold = Mathf.Cos(SmoothingAngle * Mathf.Deg2Rad);
+            var normals = new List<Vector3>(new Vector3[vertices.Count]);
+            for (int f = 0; f < faceNormals.Length; f++)
+            {
+                Vector3 own = faceNormals[f].normalized;
+                for (int corner = 0; corner < 3; corner++)
+                {
+                    int vertex = triangles[f * 3 + corner];
+                    Vector3 sum = Vector3.zero;
+                    foreach (int other in byPosition[Key(vertices[vertex])])
+                    {
+                        if (Vector3.Dot(own, faceNormals[other].normalized) >= threshold)
+                            sum += faceNormals[other];
+                    }
+                    normals[vertex] = sum.sqrMagnitude > 0f ? sum.normalized : own;
+                }
+            }
+            return normals;
+        }
+
+        /// <summary>Ключ точки с точностью до миллиметра, чтобы совпадающие углы граней считались одной точкой.</summary>
+        private static Vector3Int Key(Vector3 point) =>
+            new(Mathf.RoundToInt(point.x * 1000f), Mathf.RoundToInt(point.y * 1000f), Mathf.RoundToInt(point.z * 1000f));
 
         public static float Range(System.Random random, float min, float max) =>
             min + (float)random.NextDouble() * (max - min);

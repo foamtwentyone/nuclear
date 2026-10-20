@@ -13,33 +13,47 @@ namespace Nuclear.EditorTools.LowPoly
     {
         // ---------- Персонажи ----------
 
-        /// <summary>Выживший в противогазе с рюкзаком. Опорная точка — центр таза, ступни на -0.9.</summary>
+        /// <summary>
+        /// Выживший в противогазе с рюкзаком, из округлых форм (как персонажи Content Warning и Peak).
+        /// Опорная точка — центр таза, ступни на -0.9.
+        /// </summary>
         public static void Survivor(MeshKit k)
         {
+            var random = new System.Random(1);
+            Swatch[] Only(Swatch swatch) => new[] { swatch };
+
             foreach (float side in new[] { -1f, 1f })
             {
-                k.Box(new Vector3(0.11f * side, -0.85f, 0.03f), new Vector3(0.17f, 0.1f, 0.26f), Swatch.Boots);
-                k.Box(new Vector3(0.11f * side, -0.43f, 0f), new Vector3(0.17f, 0.76f, 0.2f), Swatch.Trousers);
-                k.Box(new Vector3(0.31f * side, 0.4f, 0f), new Vector3(0.13f, 0.34f, 0.15f), Swatch.Jacket);
-                k.Box(new Vector3(0.32f * side, 0.1f, 0.03f), new Vector3(0.12f, 0.3f, 0.14f), Quaternion.Euler(-10f, 0f, 0f), Swatch.Jacket);
-                k.Box(new Vector3(0.32f * side, -0.08f, 0.06f), new Vector3(0.1f, 0.1f, 0.12f), Swatch.Boots);
+                // Ноги и ботинки.
+                k.Capsule(new Vector3(0.11f * side, -0.02f, 0f), new Vector3(0.11f * side, -0.76f, 0.02f), 0.085f, Swatch.Trousers, random);
+                k.Ellipsoid(new Vector3(0.11f * side, -0.84f, 0.05f), Quaternion.Euler(90f, 0f, 0f), new Vector3(0.09f, 0.14f, 0.06f), 4, 8, Only(Swatch.Boots), random);
+
+                // Руки: плечо, локоть, кисть в перчатке.
+                var shoulder = new Vector3(0.26f * side, 0.56f, 0f);
+                var elbow = new Vector3(0.31f * side, 0.28f, 0.03f);
+                var wrist = new Vector3(0.32f * side, 0.04f, 0.07f);
+                k.Capsule(shoulder, elbow, 0.068f, Swatch.Jacket, random);
+                k.Capsule(elbow, wrist, 0.058f, Swatch.Jacket, random);
+                k.Ellipsoid(wrist + new Vector3(0f, -0.06f, 0.01f), Quaternion.identity, new Vector3(0.05f, 0.065f, 0.055f), 4, 8, Only(Swatch.Boots), random);
+
                 // Окуляры маски.
-                k.Cylinder(new Vector3(0.06f * side, 0.8f, 0.125f), Quaternion.Euler(90f, 0f, 0f), 0.045f, 0.045f, 0.02f, 8, Swatch.MetalDark, Swatch.Lens);
+                k.Cylinder(new Vector3(0.055f * side, 0.8f, 0.125f), Quaternion.Euler(90f, 0f, 0f), 0.042f, 0.042f, 0.025f, 8, Swatch.MetalDark, Swatch.Lens);
             }
 
-            k.Box(new Vector3(0f, 0.02f, 0f), new Vector3(0.42f, 0.12f, 0.24f), Swatch.JacketDark);
-            k.Frustum(new Vector3(0f, 0.06f, 0f), new Vector2(0.44f, 0.26f), new Vector2(0.5f, 0.28f), 0.56f, Swatch.Jacket, Swatch.Jacket);
-            k.Box(new Vector3(0f, 0.64f, -0.04f), new Vector3(0.34f, 0.1f, 0.26f), Swatch.JacketDark);
+            // Таз, туловище в куртке, воротник.
+            k.Ellipsoid(new Vector3(0f, 0.04f, 0f), Quaternion.identity, new Vector3(0.21f, 0.11f, 0.13f), 4, 10, Only(Swatch.JacketDark), random);
+            k.Ellipsoid(new Vector3(0f, 0.34f, 0f), Quaternion.identity, new Vector3(0.25f, 0.33f, 0.155f), 6, 12, Only(Swatch.Jacket), random);
+            k.Ellipsoid(new Vector3(0f, 0.63f, -0.01f), Quaternion.identity, new Vector3(0.16f, 0.05f, 0.13f), 3, 10, Only(Swatch.JacketDark), random);
 
-            // Рюкзак со скаткой.
-            k.Box(new Vector3(0f, 0.36f, -0.22f), new Vector3(0.36f, 0.42f, 0.18f), Swatch.Canvas);
-            k.Box(new Vector3(0f, 0.59f, -0.2f), new Vector3(0.34f, 0.06f, 0.2f), Swatch.JacketDark);
-            k.Cylinder(new Vector3(-0.2f, 0.66f, -0.22f), Quaternion.Euler(0f, 0f, -90f), 0.07f, 0.07f, 0.4f, 6, Swatch.Canvas, Swatch.Canvas);
+            // Рюкзак со скаткой: угловатый, это вещь, а не тело.
+            k.Box(new Vector3(0f, 0.36f, -0.22f), new Vector3(0.34f, 0.42f, 0.16f), Swatch.Canvas);
+            k.Box(new Vector3(0f, 0.59f, -0.2f), new Vector3(0.32f, 0.06f, 0.18f), Swatch.JacketDark);
+            k.Cylinder(new Vector3(-0.2f, 0.66f, -0.22f), Quaternion.Euler(0f, 0f, -90f), 0.07f, 0.07f, 0.4f, 8, Swatch.Canvas, Swatch.Canvas);
 
             // Голова: капюшон, резиновая маска, фильтр спереди.
-            k.Box(new Vector3(0f, 0.79f, -0.05f), new Vector3(0.27f, 0.3f, 0.22f), Swatch.JacketDark);
-            k.Box(new Vector3(0f, 0.77f, 0f), new Vector3(0.24f, 0.26f, 0.26f), Swatch.Rubber);
-            k.Cylinder(new Vector3(0f, 0.69f, 0.12f), Quaternion.Euler(90f, 0f, 0f), 0.055f, 0.055f, 0.1f, 8, Swatch.FilterOlive, Swatch.FilterOliveDark);
+            k.Ellipsoid(new Vector3(0f, 0.8f, -0.03f), Quaternion.identity, new Vector3(0.15f, 0.16f, 0.15f), 5, 10, Only(Swatch.JacketDark), random);
+            k.Ellipsoid(new Vector3(0f, 0.78f, 0.03f), Quaternion.identity, new Vector3(0.125f, 0.135f, 0.12f), 5, 10, Only(Swatch.Rubber), random);
+            k.Cylinder(new Vector3(0f, 0.69f, 0.11f), Quaternion.Euler(90f, 0f, 0f), 0.055f, 0.05f, 0.11f, 8, Swatch.FilterOlive, Swatch.FilterOliveDark);
         }
 
         // Слепыш — гигантская морская свинка-мутант без глаз, со звёздчатым носом, как у крота-звездоноса.

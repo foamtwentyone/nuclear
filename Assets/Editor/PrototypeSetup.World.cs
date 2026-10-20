@@ -221,7 +221,7 @@ namespace Nuclear.EditorTools
                 }
             }
 
-            var ground = AddModel(level, "Ground", kit, Vector3.zero, Quaternion.identity);
+            var ground = AddModel(level, "Ground", kit, Vector3.zero, Quaternion.identity, outline: false);
             ground.AddComponent<MeshCollider>().sharedMesh = ground.GetComponent<MeshFilter>().sharedMesh;
             MarkStatic(ground);
         }
@@ -281,7 +281,7 @@ namespace Nuclear.EditorTools
                 }
             }
 
-            MarkStatic(AddModel(level, "Road", kit, Vector3.zero, Quaternion.identity));
+            MarkStatic(AddModel(level, "Road", kit, Vector3.zero, Quaternion.identity, outline: false));
         }
 
         // ---------- Бункеры ----------
@@ -531,7 +531,7 @@ namespace Nuclear.EditorTools
                 }
                 previous = world;
             }
-            MarkStatic(AddModel(level, "Wires", wires, Vector3.zero, Quaternion.identity));
+            MarkStatic(AddModel(level, "Wires", wires, Vector3.zero, Quaternion.identity, outline: false));
         }
 
         /// <summary>Штакетник вдоль участков у дорог, с калитками напротив домов.</summary>
@@ -815,7 +815,7 @@ namespace Nuclear.EditorTools
                 Models.Rubble(kit, random, OnGround(position.x, position.y), Range(random, 0.2f, 0.8f), random.NextDouble() < 0.3);
             }
 
-            MarkStatic(AddModel(level, "Scatter", kit, Vector3.zero, Quaternion.identity));
+            MarkStatic(AddModel(level, "Scatter", kit, Vector3.zero, Quaternion.identity, outline: false));
         }
 
         /// <summary>Невидимые стены по краю игровой зоны, чтобы не уходить в холмы.</summary>
