@@ -1,3 +1,4 @@
+using Nuclear.UI;
 using Nuclear.Voice;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
@@ -14,8 +15,8 @@ namespace Nuclear.Network
         [SerializeField] private string address = "127.0.0.1";
         [SerializeField] private ushort port = 7777;
 
-        private static readonly Rect MenuRect = new(16, 16, 260, 140);
-        private static readonly Rect VoiceRect = new(16, 164, 300, 300);
+        private static readonly Rect MenuRect = new(16, 16, 270, 200);
+        private static readonly Rect VoiceRect = new(16, 224, 320, 350);
         private static ConnectionMenu instance;
 
         private readonly VoiceSettingsPanel voicePanel = new();
@@ -41,6 +42,14 @@ namespace Nuclear.Network
             if (manager == null)
                 return;
 
+            var previousSkin = GUI.skin;
+            GUI.skin = HudSkin.Get();
+            DrawMenu(manager);
+            GUI.skin = previousSkin;
+        }
+
+        private void DrawMenu(NetworkManager manager)
+        {
             GUILayout.BeginArea(MenuRect, GUI.skin.box);
 
             if (!manager.IsClient && !manager.IsServer)
