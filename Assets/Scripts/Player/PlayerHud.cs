@@ -1,11 +1,12 @@
 using Nuclear.Items;
+using Nuclear.Level;
 using UnityEngine;
 
 namespace Nuclear.Player
 {
     /// <summary>
     /// Временный HUD своего игрока: прицел, здоровье, выносливость, противогаз, дозиметр
-    /// и подсказки по предметам.
+    /// подсказки по предметам, состояние двери бункера и итог уровня.
     /// </summary>
     public class PlayerHud : MonoBehaviour
     {
@@ -20,6 +21,7 @@ namespace Nuclear.Player
         private GUIStyle hintStyle;
         private GUIStyle statusStyle;
         private GUIStyle deathStyle;
+        private GUIStyle bannerStyle;
 
         private void Awake()
         {
@@ -36,7 +38,11 @@ namespace Nuclear.Player
 
             hintStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 16 };
             statusStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerLeft, fontSize = 15, richText = true };
-            deathStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 32 };
+            deathStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 32, richText = true };
+            bannerStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperCenter, fontSize = 18, richText = true };
+
+            if (DrawOutcome())
+                return;
 
             if (survival != null && survival.IsDead)
             {
@@ -44,10 +50,53 @@ namespace Nuclear.Player
                 return;
             }
 
+            DrawDoorBanner();
             DrawCrosshair();
             DrawBars();
             DrawStatus();
             DrawHint();
+        }
+
+        /// <summary>Итог уровня поверх всего. Возвращает true, если уровень закончен.</summary>
+        private bool DrawOutcome()
+        {
+            var outcome = LevelOutcome.Current;
+            if (outcome == null || outcome.Value.Value == LevelOutcome.Result.Playing)
+                return false;
+
+            string text = outcome.Value.Value == LevelOutcome.Result.Won
+                ? "<color=#7fe07f>Вы добрались до Бункера-12</color>"
+                : "<color=#e64d33>Все погибли. Забег окончен</color>";
+            text += "\n<size=16>«Выйти» и «Создать игру» — начать заново</size>";
+            GUI.Label(new Rect(0f, 0f, Screen.width, Screen.height), text, deathStyle);
+            return true;
+        }
+
+        private void DrawDoorBanner()
+        {
+            var door = BunkerDoor.Current;
+            if (door == null)
+                return;
+
+            string text = null;
+            switch (door.State.Value)
+            {
+                case BunkerDoor.DoorState.Opening:
+                    text = $"Дверь Бункера-12 открывается: {Mathf.FloorToInt(door.Progress.Value * 100f)}%. Шумит — держитесь!";
+                    break;
+                case BunkerDoor.DoorState.Open:
+                    text = "<color=#7fe07f>Дверь открыта — все внутрь!</color>";
+                    break;
+                default:
+                    if (Time.time - door.LastRejectTime < 3f)
+                        text = "<color=#e64d33>Аккумулятор разряжен — нужен другой</color>";
+                    else if (Vector3.Distance(transform.position, door.SocketPosition) < 5f)
+                        text = "Поднесите аккумулятор к щитку справа от двери";
+                    break;
+            }
+
+            if (text != null)
+                GUI.Label(new Rect(0f, 16f, Screen.width, 40f), text, bannerStyle);
         }
 
         private static void DrawCrosshair()

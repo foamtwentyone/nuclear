@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Nuclear.Enemies;
 using Nuclear.Hazards;
 using Nuclear.Items;
+using Nuclear.Level;
 using Nuclear.Network;
 using Nuclear.Player;
 using Nuclear.World;
@@ -26,6 +27,7 @@ namespace Nuclear.EditorTools
         private const string PlayerPrefabPath = PrefabFolder + "/Player.prefab";
         private const string ScenePath = SceneFolder + "/Prototype.unity";
         private const string MaterialFolder = "Assets/Materials";
+        private static readonly Vector3 DoorPosition = new(0f, 0f, 24f);
         private const string NetworkPrefabsPath = PrefabFolder + "/NetworkPrefabs.asset";
 
         [MenuItem("Nuclear/Собрать сцену прототипа")]
@@ -46,6 +48,7 @@ namespace Nuclear.EditorTools
                 Can = BuildCanPrefab(),
                 Filter = BuildFilterPrefab(),
                 BlindOne = BuildBlindOnePrefab(),
+                Door = BuildDoorPrefab(),
             };
             BuildScene(playerPrefab, items);
 
@@ -106,6 +109,7 @@ namespace Nuclear.EditorTools
             public GameObject Can;
             public GameObject Filter;
             public GameObject BlindOne;
+            public GameObject Door;
         }
 
         private static GameObject BuildBatteryPrefab()
@@ -157,6 +161,41 @@ namespace Nuclear.EditorTools
             });
 
             return SavePrefab(root, "Crate");
+        }
+
+        /// <summary>
+        /// Подвижная часть входа в Бункер-12: створка, щиток, лампа и логика конца уровня.
+        /// Стены здания — статичная часть уровня (BuildBunker12), чтобы попасть в навигационную сетку.
+        /// </summary>
+        private static GameObject BuildDoorPrefab()
+        {
+            var root = new GameObject("Bunker12 Door");
+            root.AddComponent<NetworkObject>();
+
+            var panel = AddModel(root, PrimitiveType.Cube, new Vector3(0f, 1.3f, 0f), new Vector3(3f, 2.6f, 0.3f),
+                SaveMaterial("Door", new Color(0.3f, 0.32f, 0.3f)), withCollider: true);
+            panel.name = "Panel";
+            // Слепыш ходит по сетке и сквозь закрытую створку не пойдёт.
+            var obstacle = panel.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+            obstacle.carving = true;
+
+            var socket = AddModel(root, PrimitiveType.Cube, new Vector3(2.4f, 1.2f, -0.35f), new Vector3(0.5f, 0.7f, 0.2f),
+                SaveMaterial("Socket", new Color(0.45f, 0.42f, 0.2f)), withCollider: false);
+            socket.name = "Socket";
+
+            var inserted = AddModel(root, PrimitiveType.Cube, new Vector3(2.4f, 0.75f, -0.55f), new Vector3(0.4f, 0.28f, 0.25f),
+                SaveMaterial("Battery", new Color(0.18f, 0.2f, 0.24f)), withCollider: false);
+            inserted.name = "Inserted Battery";
+            inserted.SetActive(false);
+
+            var lamp = AddModel(root, PrimitiveType.Sphere, new Vector3(0f, 3.75f, -0.3f), Vector3.one * 0.25f,
+                SaveMaterial("Lamp", Color.red), withCollider: false);
+            lamp.name = "Lamp";
+
+            root.AddComponent<BunkerDoor>();
+            root.AddComponent<LevelOutcome>();
+
+            return SavePrefab(root, "Bunker12Door");
         }
 
         private static GameObject BuildBlindOnePrefab()
@@ -381,7 +420,7 @@ namespace Nuclear.EditorTools
             manager.NetworkConfig.NetworkTransport = transport;
             manager.NetworkConfig.PlayerPrefab = playerPrefab;
             manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
-            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter, items.BlindOne));
+            manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter, items.BlindOne, items.Door));
             networkObject.AddComponent<ConnectionMenu>();
 
             // Аккумулятор один, в случайной из трёх точек; ящики и консервы рядом со стартом.
@@ -425,8 +464,15 @@ namespace Nuclear.EditorTools
                 {
                     // Слепыш начинает в дальней части карты, подальше от шлюза.
                     prefab = items.BlindOne,
-                    positions = new[] { new Vector3(0f, 0f, 22f), new Vector3(-18f, 0f, 16f), new Vector3(20f, 0f, 14f) },
+                    positions = new[] { new Vector3(-8f, 0f, 20f), new Vector3(-18f, 0f, 16f), new Vector3(20f, 0f, 14f) },
                     count = 1,
+                },
+                new ItemSpawner.Entry
+                {
+                    prefab = items.Door,
+                    positions = new[] { DoorPosition },
+                    count = 1,
+                    randomYaw = false,
                 },
             });
 
@@ -466,11 +512,42 @@ namespace Nuclear.EditorTools
             Block(level, "Shed Right", new Vector3(10.35f, 1.25f, 18f), new Vector3(0.3f, 2.5f, 4f));
             Block(level, "Shed Roof", new Vector3(8f, 2.6f, 18f), new Vector3(5f, 0.2f, 4.3f));
 
+            BuildBunker12(level);
+
             // Навигационная сетка для Слепыша строится по коллайдерам уровня при загрузке.
             var surface = level.gameObject.AddComponent<NavMeshSurface>();
             surface.collectObjects = CollectObjects.All;
             surface.useGeometry = UnityEngine.AI.NavMeshCollectGeometry.PhysicsColliders;
             level.gameObject.AddComponent<RuntimeNavMesh>();
+        }
+
+        /// <summary>
+        /// Здание Бункера-12 в дальнем конце карты: фасад с проёмом под дверь и комната за ним.
+        /// Внутри чистый воздух и зона победы.
+        /// </summary>
+        private static void BuildBunker12(Transform level)
+        {
+            var bunker = new GameObject("Bunker-12").transform;
+            bunker.SetParent(level, false);
+            bunker.localPosition = DoorPosition;
+
+            Block(bunker, "Facade Left", new Vector3(-3.75f, 1.75f, 0f), new Vector3(4.5f, 3.5f, 0.5f));
+            Block(bunker, "Facade Right", new Vector3(3.75f, 1.75f, 0f), new Vector3(4.5f, 3.5f, 0.5f));
+            Block(bunker, "Lintel", new Vector3(0f, 3.05f, 0f), new Vector3(3f, 0.9f, 0.5f));
+            Block(bunker, "Room Left", new Vector3(-3f, 1.75f, 3f), new Vector3(0.3f, 3.5f, 5.5f));
+            Block(bunker, "Room Right", new Vector3(3f, 1.75f, 3f), new Vector3(0.3f, 3.5f, 5.5f));
+            Block(bunker, "Room Back", new Vector3(0f, 1.75f, 5.75f), new Vector3(6f, 3.5f, 0.3f));
+            Block(bunker, "Room Roof", new Vector3(0f, 3.6f, 3f), new Vector3(6.4f, 0.2f, 6f));
+
+            var goal = new GameObject("Goal (inside Bunker-12)");
+            goal.transform.SetParent(bunker, false);
+            goal.transform.localPosition = new Vector3(0f, 1.5f, 3.2f);
+            goal.AddComponent<GoalZone>().Configure(new Vector3(5.4f, 3f, 4.5f));
+
+            var air = new GameObject("Bunker-12 (safe air)");
+            air.transform.SetParent(bunker, false);
+            air.transform.localPosition = new Vector3(0f, 1.75f, 3f);
+            air.AddComponent<SafeAirZone>().Configure(new Vector3(5.6f, 3.5f, 5f));
         }
 
         /// <summary>Шлюз бункера с чистым воздухом у старта и два радиоактивных пятна.</summary>

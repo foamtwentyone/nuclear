@@ -17,6 +17,8 @@ namespace Nuclear.Items
             public GameObject prefab;
             public Vector3[] positions;
             [Min(1)] public int count = 1;
+            [Tooltip("Случайно повернуть по вертикали. Выключено для объектов, которые должны стоять ровно (дверь).")]
+            public bool randomYaw = true;
         }
 
         [SerializeField] private Entry[] entries = Array.Empty<Entry>();
@@ -44,7 +46,7 @@ namespace Nuclear.Items
                 int count = Mathf.Min(entry.count, positions.Length);
                 for (int i = 0; i < count; i++)
                 {
-                    var rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+                    var rotation = entry.randomYaw ? Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) : Quaternion.identity;
                     var instance = Instantiate(entry.prefab, positions[i], rotation);
                     instance.GetComponent<NetworkObject>().Spawn(true);
                 }

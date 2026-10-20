@@ -14,6 +14,7 @@ namespace Nuclear.Audio
         private static AudioClip growl;
         private static AudioClip swipe;
         private static AudioClip breath;
+        private static AudioClip rumble;
 
         /// <summary>Короткий щелчок счётчика Гейгера.</summary>
         public static AudioClip Click
@@ -68,6 +69,17 @@ namespace Nuclear.Audio
                 if (breath == null)
                     breath = CreateFiltered("Breath", 2.4f, 0.06f, t => Mathf.Pow(Mathf.Sin(Mathf.PI * t / 1.2f), 2f) * 0.5f);
                 return breath;
+            }
+        }
+
+        /// <summary>Низкий гул механизма двери, зацикленный.</summary>
+        public static AudioClip Rumble
+        {
+            get
+            {
+                if (rumble == null)
+                    rumble = CreateFiltered("Rumble", 2f, 0.015f, t => 1.4f + Mathf.Sin(t * Mathf.PI * 3f) * 0.3f);
+                return rumble;
             }
         }
 
