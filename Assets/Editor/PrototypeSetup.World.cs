@@ -18,19 +18,30 @@ using static Nuclear.EditorTools.LowPoly.MeshKit;
 namespace Nuclear.EditorTools
 {
     /// <summary>
-    /// Мир уровня 1 «Бункер-7 → Бункер-12»: заброшенный пригород под пеплом.
-    /// Шлюз Бункера-7 в центре, дорога с брошенными машинами, дачи, воронка, Бункер-12 на севере.
-    /// Всё статичное собирается из low-poly моделей; за границей игровой зоны — холмы в тумане.
+    /// Мир уровня 1 «Бункер-7 → Бункер-12»: заброшенный пригород под пеплом, маршрут с юга на север (~200 м).
+    /// Шлюз Бункера-7 → дачный посёлок вдоль грунтовки (пруды) → трасса с брошенными машинами (аккумулятор, Слепыш)
+    /// → развилка: короткий путь на западе через радиоактивную воронку или длинный на востоке через тёмный тоннель
+    /// в хребте → Бункер-12 (второй Слепыш рядом). Хребет между путями не перелезть; за границей — холмы в тумане.
     /// </summary>
     public static partial class PrototypeSetup
     {
-        private const float RoadZ = 10f;
-        private const float PlayAreaHalf = 31f;
-        private static readonly Vector3 DoorPosition = new(0f, 0f, 24f);
-        private static readonly Vector2 CraterCenter = new(14f, -14f);
-        private static readonly Vector2 WeakSpotCenter = new(-14f, -10f);
+        // Игровая зона: прямоугольник маршрута.
+        private const float PlayMinX = -45f, PlayMaxX = 45f, PlayMinZ = -12f, PlayMaxZ = 196f;
+        private const float RoadZ = 68f;
+        private static readonly Vector3 DoorPosition = new(0f, 0f, 185f);
+        private static readonly Vector2 CraterCenter = new(-27f, 121f);
+        private const float CraterRadius = 10f;
+        private static readonly Vector2 WeakSpotCenter = new(-34f, 143f);
 
-        // Точки появления предметов и Слепыша: рядом с ними ничего не ставим.
+        // Хребет между путями развилки и тоннель сквозь него.
+        private static readonly Rect Ridge = new(-14f, 95f, 59f, 50f);
+        private const float TunnelX = 30f;
+        private const float TunnelHalfWidth = 3f;
+        private const float TunnelHeight = 4.5f;
+
+        // Пруды в посёлке (у них будут жить лягушки).
+        private static readonly Vector3[] Ponds = { new(-23f, 40f, 3.2f), new(24f, 30f, 2.6f) };
+
         /// <summary>Машины, у которых вскрывается капот (CarHood): где стоят, куда смотрят, какого цвета.</summary>
         private struct HoodCar
         {
@@ -42,24 +53,25 @@ namespace Nuclear.EditorTools
 
         private static readonly HoodCar[] HoodCars =
         {
-            new() { Position = new Vector2(-8f, 9f), Yaw = 90f, Paint = Swatch.PaintRed, Seed = 201 },
-            new() { Position = new Vector2(13.5f, 8.5f), Yaw = 80f, Paint = Swatch.PaintBlue, Seed = 202 },
-            new() { Position = new Vector2(10.5f, -8f), Yaw = 20f, Paint = Swatch.PaintBeige, Seed = 203 },
+            new() { Position = new Vector2(-22f, 67f), Yaw = 90f, Paint = Swatch.PaintRed, Seed = 201 },
+            new() { Position = new Vector2(6f, 69.5f), Yaw = 80f, Paint = Swatch.PaintBlue, Seed = 202 },
+            new() { Position = new Vector2(27f, 66.5f), Yaw = 100f, Paint = Swatch.PaintBeige, Seed = 203 },
         };
 
-        private static readonly Vector3[] BatterySpawns = { new(8f, 0.3f, -6f), new(-8f, 0.3f, 12f), new(12f, 0.3f, 10f) };
         private static readonly Vector3[] CrateSpawns = { new(2f, 0.4f, 4f), new(3f, 0.4f, 4.5f), new(-3f, 0.4f, 3f) };
-        private static readonly Vector3[] CanSpawns = { new(1f, 0.2f, 2f), new(1.4f, 0.2f, 2.3f), new(-1f, 0.2f, 2.5f), new(-1.5f, 0.2f, 1.8f), new(0f, 0.2f, 3f) };
-        private static readonly Vector3[] FilterSpawns = { new(6f, 0.2f, 10f), new(-10f, 0.2f, 5f), new(10f, 0.2f, -2f), new(-4f, 0.2f, -12f), new(16f, 0.2f, 4f), new(14f, 0.2f, -14f) };
+        private static readonly Vector3[] CanSpawns = { new(1f, 0.2f, 2f), new(1.4f, 0.2f, 2.3f), new(-1f, 0.2f, 2.5f), new(-1.5f, 0.2f, 1.8f), new(0f, 0.2f, 3f), new(-9f, 0.2f, 22f), new(10f, 0.2f, 48f), new(-4f, 0.2f, 74f) };
+        private static readonly Vector3[] FilterSpawns = { new(-10f, 0.2f, 24f), new(10f, 0.2f, 44f), new(-20f, 0.2f, 62f), new(18f, 0.2f, 75f), new(-31f, 0.2f, 108f), new(-27f, 0.2f, 121f), new(30f, 0.2f, 128f), new(-6f, 0.2f, 165f) };
         // Стартовое снаряжение на столе в шлюзе Бункера-7: на всех не хватит, придётся делить.
         private static readonly Vector3[] TableBandages = { new(-3.45f, 0.86f, -2.1f), new(-3.25f, 0.86f, -2.2f) };
         private static readonly Vector3[] TableFlashlights = { new(-2.85f, 0.86f, -1.85f), new(-2.6f, 0.86f, -1.9f) };
         private static readonly Vector3[] TableCrowbar = { new(-3f, 0.84f, -2.28f) };
         private static readonly Vector3[] TableBatteries = { new(-2.45f, 0.84f, -2.25f), new(-2.38f, 0.84f, -2.15f) };
         // По дороге: ещё бинты и батарейки в случайных местах.
-        private static readonly Vector3[] BandageSpawns = { new(7f, 0.2f, 9f), new(-9f, 0.2f, 6f), new(11f, 0.2f, -3f), new(-6f, 0.2f, 14f) };
-        private static readonly Vector3[] FlashlightBatterySpawns = { new(5.5f, 0.2f, 13.5f), new(-11f, 0.2f, 3f), new(7f, 0.2f, -10.5f), new(15f, 0.2f, 6f) };
-        private static readonly Vector3[] BlindOneSpawns = { new(-8f, 0f, 20f), new(-18f, 0f, 16f), new(20f, 0f, 14f) };
+        private static readonly Vector3[] BandageSpawns = { new(-14f, 0.2f, 40f), new(14f, 0.2f, 24f), new(-24f, 0.2f, 74f), new(31f, 0.2f, 112f), new(8f, 0.2f, 160f) };
+        private static readonly Vector3[] FlashlightBatterySpawns = { new(12f, 0.2f, 33f), new(-12f, 0.2f, 54f), new(24f, 0.2f, 62f), new(32f, 0.2f, 90f), new(-20f, 0.2f, 150f) };
+        // Слепыш на трассе и второй — у Бункера-12: шум открывающейся двери его точно приведёт.
+        private static readonly Vector3[] BlindOneSpawns = { new(-12f, 0f, 77f), new(12f, 0f, 79f), new(0f, 0f, 83f) };
+        private static readonly Vector3[] FinaleBlindOneSpawns = { new(-12f, 0f, 168f), new(13f, 0f, 170f) };
 
         /// <summary>Занятые места: прямоугольники построек и круги вокруг важных точек.</summary>
         private static readonly List<Rect> blockedRects = new();
@@ -81,7 +93,7 @@ namespace Nuclear.EditorTools
             menuCamera.clearFlags = CameraClearFlags.SolidColor;
             menuCamera.backgroundColor = FogColor;
             menuCamera.farClipPlane = 120f;
-            menuCamera.transform.SetPositionAndRotation(new Vector3(-9f, 4.5f, 17f), Quaternion.Euler(14f, 150f, 0f));
+            menuCamera.transform.SetPositionAndRotation(new Vector3(9f, 5.5f, 34f), Quaternion.Euler(13f, 200f, 0f));
             menuCamera.depth = -10f;
             ConfigureCameraForPipeline(menuCamera);
 
@@ -121,11 +133,12 @@ namespace Nuclear.EditorTools
             spawner.SetEntries(new[]
             {
                 new ItemSpawner.Entry { prefab = items.Crate, positions = CrateSpawns, count = 3 },
-                new ItemSpawner.Entry { prefab = items.Can, positions = CanSpawns, count = 5 },
+                new ItemSpawner.Entry { prefab = items.Can, positions = CanSpawns, count = 7 },
                 // Один из вариантов — в центре воронки: фильтр за дозу.
-                new ItemSpawner.Entry { prefab = items.Filter, positions = FilterSpawns, count = 3 },
+                new ItemSpawner.Entry { prefab = items.Filter, positions = FilterSpawns, count = 5 },
                 // Слепыш начинает в дальней части карты, подальше от шлюза.
                 new ItemSpawner.Entry { prefab = items.BlindOne, positions = BlindOneSpawns, count = 1 },
+                new ItemSpawner.Entry { prefab = items.BlindOne, positions = FinaleBlindOneSpawns, count = 1 },
                 new ItemSpawner.Entry { prefab = items.Door, positions = new[] { DoorPosition }, count = 1, randomYaw = false },
                 new ItemSpawner.Entry { prefab = items.Hoods[0], positions = new[] { OnGround(HoodCars[0].Position.x, HoodCars[0].Position.y) }, yaws = new[] { HoodCars[0].Yaw }, count = 1 },
                 new ItemSpawner.Entry { prefab = items.Hoods[1], positions = new[] { OnGround(HoodCars[1].Position.x, HoodCars[1].Position.y) }, yaws = new[] { HoodCars[1].Yaw }, count = 1 },
@@ -134,8 +147,8 @@ namespace Nuclear.EditorTools
                 new ItemSpawner.Entry { prefab = items.Gear.Flashlight, positions = TableFlashlights, count = TableFlashlights.Length },
                 new ItemSpawner.Entry { prefab = items.Gear.Crowbar, positions = TableCrowbar, count = 1, randomYaw = false },
                 new ItemSpawner.Entry { prefab = items.Gear.Battery, positions = TableBatteries, count = TableBatteries.Length },
-                new ItemSpawner.Entry { prefab = items.Gear.Bandage, positions = BandageSpawns, count = 2 },
-                new ItemSpawner.Entry { prefab = items.Gear.Battery, positions = FlashlightBatterySpawns, count = 2 },
+                new ItemSpawner.Entry { prefab = items.Gear.Bandage, positions = BandageSpawns, count = 3 },
+                new ItemSpawner.Entry { prefab = items.Gear.Battery, positions = FlashlightBatterySpawns, count = 3 },
             });
         }
 
@@ -176,15 +189,20 @@ namespace Nuclear.EditorTools
         {
             blockedRects.Clear();
             blockedCircles.Clear();
-            foreach (var spawns in new[] { BatterySpawns, CrateSpawns, CanSpawns, FilterSpawns, BandageSpawns, FlashlightBatterySpawns, BlindOneSpawns })
+            foreach (var spawns in new[] { CrateSpawns, CanSpawns, FilterSpawns, BandageSpawns, FlashlightBatterySpawns, BlindOneSpawns, FinaleBlindOneSpawns })
             {
                 foreach (var point in spawns)
                     blockedCircles.Add(new Vector3(point.x, point.z, 1.8f));
             }
-            blockedRects.Add(new Rect(-PlayAreaHalf - 20f, RoadZ - 3.5f, PlayAreaHalf * 2f + 40f, 7f));
+            blockedRects.Add(new Rect(PlayMinX - 30f, RoadZ - 3.5f, PlayMaxX - PlayMinX + 60f, 7f));
+            blockedRects.Add(new Rect(-3.5f, 5f, 7f, 58f)); // грунтовка через посёлок
+            blockedRects.Add(Ridge);
 
             BuildGround(level);
             BuildRoad(level);
+            BuildLane(level);
+            BuildPonds(level);
+            BuildRidgeTunnel(level);
             BuildBunker7(level);
             BuildBunker12(level);
             BuildHouses(level);
@@ -208,21 +226,50 @@ namespace Nuclear.EditorTools
         {
             float h = -0.12f * Mathf.PerlinNoise(x * 0.15f + 100f, z * 0.15f + 100f);
 
+            // Ровно под дорогой, грунтовкой, бункерами и тоннелем.
             float flat = Mathf.InverseLerp(3.5f, 5f, Mathf.Abs(z - RoadZ));
             flat = Mathf.Min(flat, RectFalloff(x, z, new Rect(-7f, -7f, 14f, 14f), 1.5f));
-            flat = Mathf.Min(flat, RectFalloff(x, z, new Rect(-8f, 21f, 16f, 10f), 1.5f));
+            flat = Mathf.Min(flat, RectFalloff(x, z, new Rect(DoorPosition.x - 9f, DoorPosition.z - 4f, 18f, 12f), 1.5f));
+            flat = Mathf.Min(flat, RectFalloff(x, z, new Rect(-3f, 5f, 6f, 58f), 1f));
+            flat = Mathf.Min(flat, RectFalloff(x, z, new Rect(TunnelX - 4.5f, Ridge.yMin - 6f, 9f, Ridge.height + 12f), 1f));
             h *= flat;
 
+            // Воронка: чаша с валом.
             float crater = Vector2.Distance(new Vector2(x, z), CraterCenter);
-            if (crater < 7f)
-                h -= 1.1f * (1f - crater * crater / 49f);
-            h += 0.35f * Mathf.Exp(-Mathf.Pow((crater - 7.5f) / 1.2f, 2f));
+            if (crater < CraterRadius)
+                h -= 1.8f * (1f - crater * crater / (CraterRadius * CraterRadius));
+            h += 0.5f * Mathf.Exp(-Mathf.Pow((crater - CraterRadius - 0.6f) / 1.6f, 2f));
 
-            float edge = Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
-            if (edge > 30f)
-                h += Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(30f, 46f, edge)) * (5f + 4f * Mathf.PerlinNoise(x * 0.05f, z * 0.05f));
+            // Пруды — неглубокие ямки под водой.
+            foreach (var pond in Ponds)
+            {
+                float d = Vector2.Distance(new Vector2(x, z), new Vector2(pond.x, pond.y));
+                if (d < pond.z + 0.6f)
+                    h -= 0.45f * Mathf.SmoothStep(1f, 0f, d / (pond.z + 0.6f));
+            }
+
+            h += RidgeHeight(x, z);
+
+            // За границей игровой зоны — холмы.
+            float outside = Mathf.Max(Mathf.Max(PlayMinX - x, x - PlayMaxX), Mathf.Max(PlayMinZ - z, z - PlayMaxZ));
+            if (outside > -1f)
+                h += Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-1f, 15f, outside)) * (5f + 4f * Mathf.PerlinNoise(x * 0.05f, z * 0.05f));
 
             return h;
+        }
+
+        /// <summary>
+        /// Хребет между путями развилки: крутые склоны (не взобраться) и прорезь посередине,
+        /// в которой стоит бетонный тоннель.
+        /// </summary>
+        private static float RidgeHeight(float x, float z)
+        {
+            float inside = Mathf.Min(Mathf.Min(x - Ridge.xMin, Ridge.xMax - x), Mathf.Min(z - Ridge.yMin, Ridge.yMax - z));
+            if (inside <= 0f)
+                return 0f;
+            float hill = 10f * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(inside / 6f)) * (0.85f + 0.3f * Mathf.PerlinNoise(x * 0.08f + 31f, z * 0.08f));
+            float slot = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(TunnelHalfWidth + 1.5f, TunnelHalfWidth + 5.5f, Mathf.Abs(x - TunnelX)));
+            return hill * slot;
         }
 
         /// <summary>0 внутри прямоугольника, плавно до 1 на расстоянии falloff от него.</summary>
@@ -237,17 +284,19 @@ namespace Nuclear.EditorTools
 
         private static void BuildGround(Transform level)
         {
-            const float extent = 60f;
             const float cell = 1.25f;
-            int cells = Mathf.RoundToInt(extent * 2f / cell);
+            const float margin = 30f;
+            float minX = PlayMinX - margin, minZ = PlayMinZ - margin;
+            int cellsX = Mathf.RoundToInt((PlayMaxX - PlayMinX + margin * 2f) / cell);
+            int cellsZ = Mathf.RoundToInt((PlayMaxZ - PlayMinZ + margin * 2f) / cell);
             var random = new System.Random(1);
             var kit = new MeshKit();
 
-            for (int ix = 0; ix < cells; ix++)
+            for (int ix = 0; ix < cellsX; ix++)
             {
-                for (int iz = 0; iz < cells; iz++)
+                for (int iz = 0; iz < cellsZ; iz++)
                 {
-                    float x0 = -extent + ix * cell, z0 = -extent + iz * cell;
+                    float x0 = minX + ix * cell, z0 = minZ + iz * cell;
                     float x1 = x0 + cell, z1 = z0 + cell;
                     var a = OnGround(x0, z0);
                     var b = OnGround(x0, z1);
@@ -267,11 +316,12 @@ namespace Nuclear.EditorTools
         {
             double roll = random.NextDouble();
             float crater = Vector2.Distance(new Vector2(point.x, point.z), CraterCenter);
-            if (crater < 7.5f)
+            if (crater < CraterRadius)
                 return roll < 0.6 ? Swatch.Scorched : Swatch.ScorchedLight;
-            if (crater < 10f)
+            if (crater < CraterRadius + 2.5f)
                 return roll < 0.6 ? Swatch.AshDark : Swatch.Scorched;
-            if (Mathf.Max(Mathf.Abs(point.x), Mathf.Abs(point.z)) > 32f)
+            // Склоны хребта и холмов — тёмная земля и пепел.
+            if (point.y > 1.2f || point.x < PlayMinX - 1f || point.x > PlayMaxX + 1f || point.z < PlayMinZ - 1f || point.z > PlayMaxZ + 1f)
                 return roll < 0.5 ? Swatch.AshDark : Swatch.Dirt;
 
             // Крупные пятна (трава, грязь, пепел) и мелкая рябь внутри них — по шуму, а не случайно,
@@ -294,7 +344,8 @@ namespace Nuclear.EditorTools
             const float y = 0.03f;
             var random = new System.Random(2);
             var kit = new MeshKit();
-            int segments = Mathf.RoundToInt(120f / step);
+            const float roadStart = PlayMinX - 30f;
+            int segments = Mathf.RoundToInt((PlayMaxX - PlayMinX + 60f) / step);
             var near = new float[segments + 1];
             var far = new float[segments + 1];
             for (int i = 0; i <= segments; i++)
@@ -305,7 +356,7 @@ namespace Nuclear.EditorTools
 
             for (int i = 0; i < segments; i++)
             {
-                float x0 = -60f + i * step, x1 = x0 + step;
+                float x0 = roadStart + i * step, x1 = x0 + step;
                 var swatch = random.NextDouble() < 0.2 ? Swatch.AsphaltDark : Swatch.Asphalt;
                 kit.Quad(new Vector3(x0, y, near[i]), new Vector3(x0, y, far[i]), new Vector3(x1, y, far[i + 1]), new Vector3(x1, y, near[i + 1]), swatch);
 
@@ -448,7 +499,7 @@ namespace Nuclear.EditorTools
             air.transform.localPosition = new Vector3(0f, 1.75f, 3f);
             air.AddComponent<SafeAirZone>().Configure(new Vector3(5.6f, 3.5f, 5f));
 
-            blockedRects.Add(new Rect(-8f, 20f, 16f, 11f));
+            blockedRects.Add(new Rect(DoorPosition.x - 8f, DoorPosition.z - 4f, 16f, 11f));
         }
 
         /// <summary>Эхо бетонной комнаты: все звуки внутри бункера звучат гулко.</summary>
@@ -504,14 +555,17 @@ namespace Nuclear.EditorTools
             var standard = new Models.HouseOptions { Width = 5f, Depth = 4f, WallHeight = 2.4f, Windows = true };
             var shed = new Models.HouseOptions { Width = 5f, Depth = 4f, WallHeight = 2.3f, OpenFront = true };
 
-            // Дома к северу от дороги смотрят дверью на юг (на дорогу), к югу — на север.
-            PlaceHouse(level, "Dacha 1", new Vector2(-15f, -1f), 180f, standard, 101);
-            PlaceHouse(level, "Dacha 2", new Vector2(19f, -1f), 180f, standard, 102);
-            PlaceHouse(level, "Dacha 3", new Vector2(-17f, 20f), 0f, standard, 103);
-            PlaceHouse(level, "Dacha 4", new Vector2(19f, 20f), 0f, standard, 104);
-            PlaceHouse(level, "Dacha 5", new Vector2(-9f, -17f), 180f, standard, 105);
+            // Дачи вдоль грунтовки: западные смотрят дверью на восток (на улицу), восточные — на запад.
+            PlaceHouse(level, "Dacha 1", new Vector2(-13f, 18f), 90f, standard, 101);
+            PlaceHouse(level, "Dacha 2", new Vector2(-14f, 32f), 90f, standard, 102);
+            PlaceHouse(level, "Dacha 3", new Vector2(-13f, 50f), 90f, standard, 103);
+            PlaceHouse(level, "Dacha 4", new Vector2(13f, 22f), 270f, standard, 104);
+            PlaceHouse(level, "Dacha 5", new Vector2(14f, 40f), 270f, standard, 105);
             // Сарай без передней стены: укрытие, чтобы прятаться от Слепыша.
-            PlaceHouse(level, "Shed", new Vector2(8f, 18f), 0f, shed, 106);
+            PlaceHouse(level, "Shed", new Vector2(13f, 54f), 270f, shed, 106);
+            // Дома у трассы и у Бункера-12.
+            PlaceHouse(level, "Roadside House", new Vector2(-33f, 78f), 180f, standard, 107);
+            PlaceHouse(level, "Guard House", new Vector2(14f, 176f), 270f, shed, 108);
         }
 
         private static void PlaceHouse(Transform level, string name, Vector2 position, float yaw, Models.HouseOptions options, int seed)
@@ -528,9 +582,13 @@ namespace Nuclear.EditorTools
             // Три машины с открывающимся капотом: под одним из них аккумулятор.
             foreach (var spot in HoodCars)
                 PlaceCar(level, new Vector2(spot.Position.x, spot.Position.y), spot.Yaw, spot.Paint, spot.Seed, openableHood: true);
-            PlaceCar(level, new Vector2(-21f, 11f), 100f, Swatch.PaintGreen, 204);
-            PlaceCar(level, new Vector2(3f, 11.5f), 260f, Swatch.PaintBeige, 205);
-            PlaceCar(level, new Vector2(24f, 9.5f), 95f, Swatch.PaintRed, 206);
+            PlaceCar(level, new Vector2(-36f, 68.5f), 95f, Swatch.PaintGreen, 204);
+            PlaceCar(level, new Vector2(-8f, 66.5f), 265f, Swatch.PaintBeige, 205);
+            PlaceCar(level, new Vector2(16f, 69f), 275f, Swatch.PaintRed, 206);
+            PlaceCar(level, new Vector2(39f, 67f), 85f, Swatch.PaintBlue, 207);
+            PlaceCar(level, new Vector2(4.8f, 28f), 8f, Swatch.PaintGreen, 208);
+            // Брошенная машина в тоннеле перегораживает полпрохода.
+            PlaceCar(level, new Vector2(TunnelX + 0.9f, 120f), 12f, Swatch.PaintBeige, 209);
         }
 
         private static void PlaceCar(Transform level, Vector2 position, float yaw, Swatch paint, int seed, bool openableHood = false)
@@ -547,7 +605,7 @@ namespace Nuclear.EditorTools
             var random = new System.Random(3);
             var wires = new MeshKit();
             Vector3[] previous = null;
-            foreach (float x in new[] { -38f, -26f, -14f, -2f, 10f, 22f, 34f })
+            for (float x = PlayMinX - 12f; x <= PlayMaxX + 12f; x += 12f)
             {
                 var position = OnGround(x, RoadZ + 4.5f);
                 var kit = new MeshKit();
@@ -576,28 +634,39 @@ namespace Nuclear.EditorTools
             var random = new System.Random(4);
             var kit = new MeshKit();
             const float segment = 2.4f;
-            // Линии: начало по X, конец по X, Z линии, X калитки.
-            var lines = new[]
-            {
-                new Vector4(-21f, -11f, 2.5f, -15f),
-                new Vector4(13f, 25f, 2.5f, 19f),
-                new Vector4(-23f, -11f, 16.8f, -17f),
-                new Vector4(13f, 25f, 16.8f, 19f),
-            };
-
-            foreach (var line in lines)
-            {
-                for (float x = line.x; x + segment <= line.y + 0.01f; x += segment)
-                {
-                    float middle = x + segment / 2f;
-                    if (Mathf.Abs(middle - line.w) < 1.2f || IsNearSpawn(new Vector2(middle, line.z), 1.6f))
-                        continue;
-                    kit.Push(OnGround(x, line.z), Quaternion.identity);
-                    Models.FenceSegment(kit, random, segment);
-                    kit.Pop();
-                }
-            }
+            // Заборы вдоль грунтовки (по Z) с калитками напротив дач.
+            FenceAlongZ(kit, random, segment, -6.5f, 10f, 60f, new[] { 18f, 32f, 50f });
+            FenceAlongZ(kit, random, segment, 6.5f, 10f, 60f, new[] { 22f, 40f, 54f });
+            // Ограда вокруг Бункера-12 с проходами с юга, с запада и с востока.
+            FenceAlongX(kit, random, segment, DoorPosition.z - 14f, DoorPosition.x - 20f, DoorPosition.x + 20f, new[] { DoorPosition.x - 1.2f, DoorPosition.x + 1.2f, DoorPosition.x - 3.6f, DoorPosition.x + 3.6f });
             MarkStatic(AddModel(level, "Fences", kit, Vector3.zero, Quaternion.identity));
+        }
+
+        private static void FenceAlongZ(MeshKit kit, System.Random random, float segment, float x, float fromZ, float toZ, float[] gates)
+        {
+            for (float z = fromZ; z + segment <= toZ + 0.01f; z += segment)
+            {
+                float middle = z + segment / 2f;
+                if (System.Array.Exists(gates, gate => Mathf.Abs(middle - gate) < 1.2f) || IsNearSpawn(new Vector2(x, middle), 1.6f))
+                    continue;
+                // Сегмент строится вдоль +X; поворот на −90° по Y кладёт его вдоль +Z.
+                kit.Push(OnGround(x, z), Quaternion.Euler(0f, -90f, 0f));
+                Models.FenceSegment(kit, random, segment);
+                kit.Pop();
+            }
+        }
+
+        private static void FenceAlongX(MeshKit kit, System.Random random, float segment, float z, float fromX, float toX, float[] gates)
+        {
+            for (float x = fromX; x + segment <= toX + 0.01f; x += segment)
+            {
+                float middle = x + segment / 2f;
+                if (System.Array.Exists(gates, gate => Mathf.Abs(middle - gate) < 1.2f) || IsNearSpawn(new Vector2(middle, z), 1.6f))
+                    continue;
+                kit.Push(OnGround(x, z), Quaternion.identity);
+                Models.FenceSegment(kit, random, segment);
+                kit.Pop();
+            }
         }
 
         /// <summary>Видимые признаки радиации: светящиеся осколки в воронке, протёкшие бочки у слабого пятна.</summary>
@@ -612,10 +681,10 @@ namespace Nuclear.EditorTools
             MarkStatic(AddModel(level, "Crater Shards", shards, Vector3.zero, Quaternion.identity, glowMaterial));
 
             var rim = new MeshKit();
-            for (int i = 0; i < 14; i++)
+            for (int i = 0; i < 22; i++)
             {
                 float angle = Range(random, 0f, Mathf.PI * 2f);
-                float radius = Range(random, 6.5f, 9.5f);
+                float radius = Range(random, CraterRadius - 0.5f, CraterRadius + 2.5f);
                 Models.Rubble(rim, random, OnGround(CraterCenter.x + Mathf.Cos(angle) * radius, CraterCenter.y + Mathf.Sin(angle) * radius), Range(random, 0.3f, 0.9f), false);
             }
             MarkStatic(AddModel(level, "Crater Rubble", rim, Vector3.zero, Quaternion.identity));
@@ -641,10 +710,10 @@ namespace Nuclear.EditorTools
 
             var zones = new GameObject("Radiation").transform;
             zones.SetParent(level, false);
-            AddRadiationZone(zones, "Crater (radiation)", new Vector3(CraterCenter.x, 1f, CraterCenter.y), 9f, 4f);
+            AddRadiationZone(zones, "Crater (radiation)", new Vector3(CraterCenter.x, 1f, CraterCenter.y), CraterRadius + 3f, 4f);
             AddRadiationZone(zones, "Weak Spot (radiation)", new Vector3(WeakSpotCenter.x, 1f, WeakSpotCenter.y), 6f, 1.5f);
 
-            blockedCircles.Add(new Vector3(CraterCenter.x, CraterCenter.y, 6.5f));
+            blockedCircles.Add(new Vector3(CraterCenter.x, CraterCenter.y, CraterRadius - 2f));
             blockedCircles.Add(new Vector3(WeakSpotCenter.x, WeakSpotCenter.y, 3f));
         }
 
@@ -655,7 +724,7 @@ namespace Nuclear.EditorTools
         {
             var random = new System.Random(15);
             var ember = SaveMaterial("Ember", new Color(1f, 0.45f, 0.15f), emission: new Color(2.4f, 0.9f, 0.25f));
-            foreach (var spot in new[] { new Vector2(-4.6f, 6.4f), new Vector2(4.9f, 21.3f) })
+            foreach (var spot in new[] { new Vector2(-4.6f, 6.4f), new Vector2(-4.2f, 60f), new Vector2(TunnelX + 5f, Ridge.yMin - 4f), new Vector2(TunnelX - 5f, Ridge.yMax + 4f), new Vector2(4.9f, DoorPosition.z - 3.7f) })
             {
                 var position = OnGround(spot.x, spot.y);
                 var kit = new MeshKit();
@@ -713,9 +782,9 @@ namespace Nuclear.EditorTools
         {
             var random = new System.Random(6);
             int placed = 0;
-            for (int attempt = 0; attempt < 400 && placed < 34; attempt++)
+            for (int attempt = 0; attempt < 1500 && placed < 130; attempt++)
             {
-                var position = new Vector2(Range(random, -29f, 29f), Range(random, -29f, 29f));
+                var position = new Vector2(Range(random, PlayMinX + 2f, PlayMaxX - 2f), Range(random, PlayMinZ + 2f, PlayMaxZ - 2f));
                 if (IsBlocked(position, 1.5f) || (position.magnitude < 12f && random.NextDouble() < 0.6))
                     continue;
                 PlaceTree(level, random, position, collider: true);
@@ -723,16 +792,17 @@ namespace Nuclear.EditorTools
                 placed++;
             }
 
-            // За границей: квадратное кольцо, чтобы и по диагонали деревья не попали в игровую зону.
-            for (int i = 0; i < 40; i++)
+            // За границей и на хребте — без коллайдеров, это фон.
+            for (int placedOutside = 0, attempt = 0; placedOutside < 110 && attempt < 5000; attempt++)
             {
-                var position = new Vector2(Range(random, -50f, 50f), Range(random, -50f, 50f));
-                if (Mathf.Max(Mathf.Abs(position.x), Mathf.Abs(position.y)) < 34f)
-                {
-                    i--;
+                var position = new Vector2(Range(random, PlayMinX - 22f, PlayMaxX + 22f), Range(random, PlayMinZ - 22f, PlayMaxZ + 22f));
+                bool outside = position.x < PlayMinX - 3f || position.x > PlayMaxX + 3f || position.y < PlayMinZ - 3f || position.y > PlayMaxZ + 3f;
+                // Мёртвый лес и на макушке хребта — силуэтом над тоннелем.
+                bool onRidge = Ridge.Contains(position) && RidgeHeight(position.x, position.y) > 7f;
+                if (!outside && !onRidge)
                     continue;
-                }
                 PlaceTree(level, random, position, collider: false);
+                placedOutside++;
             }
         }
 
@@ -758,12 +828,12 @@ namespace Nuclear.EditorTools
             var kit = new MeshKit();
 
             // Трава гуще там, где земля и так травяная (те же пятна шума, что в GroundSwatch): заросли, а не посыпка.
-            for (int i = 0; i < 3600; i++)
+            for (int i = 0; i < 12000; i++)
             {
                 // Почти вся трава в игровой зоне, немного — на склонах за ней.
-                float extent = i % 6 == 0 ? 45f : 31f;
-                var position = new Vector2(Range(random, -extent, extent), Range(random, -extent, extent));
-                if (IsInsideBuilding(position) || Mathf.Abs(position.y - RoadZ) < 3.2f)
+                float pad = i % 6 == 0 ? 12f : 0f;
+                var position = new Vector2(Range(random, PlayMinX - pad, PlayMaxX + pad), Range(random, PlayMinZ - pad, PlayMaxZ + pad));
+                if (IsInsideBuilding(position) || Mathf.Abs(position.y - RoadZ) < 3.2f || IsInTunnelSlot(position))
                     continue;
                 float patch = Mathf.PerlinNoise(position.x * 0.07f + 7f, position.y * 0.07f + 3f);
                 if (random.NextDouble() > (patch > 0.55f ? 1.0 : 0.2))
@@ -771,17 +841,17 @@ namespace Nuclear.EditorTools
                 Models.GrassTuft(kit, random, OnGround(position.x, position.y));
             }
 
-            for (int i = 0; i < 40; i++)
+            for (int i = 0; i < 180; i++)
             {
-                var position = new Vector2(Range(random, -29f, 29f), Range(random, -29f, 29f));
+                var position = new Vector2(Range(random, PlayMinX + 1f, PlayMaxX - 1f), Range(random, PlayMinZ + 1f, PlayMaxZ - 1f));
                 if (IsInsideBuilding(position))
                     continue;
                 Models.Debris(kit, random, OnGround(position.x, position.y));
             }
 
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 140; i++)
             {
-                var position = new Vector2(Range(random, -29f, 29f), Range(random, -29f, 29f));
+                var position = new Vector2(Range(random, PlayMinX + 1f, PlayMaxX - 1f), Range(random, PlayMinZ + 1f, PlayMaxZ - 1f));
                 if (IsBlocked(position, 1f))
                     continue;
                 Models.Rubble(kit, random, OnGround(position.x, position.y), Range(random, 0.2f, 0.8f), random.NextDouble() < 0.3);
@@ -795,13 +865,24 @@ namespace Nuclear.EditorTools
         {
             var boundary = new GameObject("Boundary");
             boundary.transform.SetParent(level, false);
-            foreach (var (center, size) in new[]
+            float width = PlayMaxX - PlayMinX, length = PlayMaxZ - PlayMinZ;
+            float centerX = (PlayMinX + PlayMaxX) / 2f, centerZ = (PlayMinZ + PlayMaxZ) / 2f;
+            var walls = new List<(Vector3 center, Vector3 size)>
             {
-                (new Vector3(0f, 3f, PlayAreaHalf), new Vector3(PlayAreaHalf * 2f, 8f, 1f)),
-                (new Vector3(0f, 3f, -PlayAreaHalf), new Vector3(PlayAreaHalf * 2f, 8f, 1f)),
-                (new Vector3(PlayAreaHalf, 3f, 0f), new Vector3(1f, 8f, PlayAreaHalf * 2f)),
-                (new Vector3(-PlayAreaHalf, 3f, 0f), new Vector3(1f, 8f, PlayAreaHalf * 2f)),
-            })
+                (new Vector3(centerX, 3f, PlayMaxZ), new Vector3(width, 8f, 1f)),
+                (new Vector3(centerX, 3f, PlayMinZ), new Vector3(width, 8f, 1f)),
+                (new Vector3(PlayMaxX, 3f, centerZ), new Vector3(1f, 8f, length)),
+                (new Vector3(PlayMinX, 3f, centerZ), new Vector3(1f, 8f, length)),
+            };
+            // Хребет: стенки по подножию, кроме проёмов тоннеля, — чтобы не залезть на склон.
+            float gapWest = TunnelX - TunnelHalfWidth - 0.5f, gapEast = TunnelX + TunnelHalfWidth + 0.5f;
+            foreach (float z in new[] { Ridge.yMin, Ridge.yMax })
+            {
+                walls.Add((new Vector3((Ridge.xMin + gapWest) / 2f, 5f, z), new Vector3(gapWest - Ridge.xMin, 12f, 1f)));
+                walls.Add((new Vector3((gapEast + Ridge.xMax) / 2f, 5f, z), new Vector3(Ridge.xMax - gapEast, 12f, 1f)));
+            }
+            walls.Add((new Vector3(Ridge.xMin, 5f, Ridge.center.y), new Vector3(1f, 12f, Ridge.height)));
+            foreach (var (center, size) in walls)
             {
                 var wall = new GameObject("Wall");
                 wall.transform.SetParent(boundary.transform, false);
@@ -826,7 +907,7 @@ namespace Nuclear.EditorTools
 
         private static bool IsNearSpawn(Vector2 point, float margin)
         {
-            foreach (var spawns in new[] { BatterySpawns, FilterSpawns, BandageSpawns, FlashlightBatterySpawns, BlindOneSpawns })
+            foreach (var spawns in new[] { FilterSpawns, BandageSpawns, FlashlightBatterySpawns, BlindOneSpawns, FinaleBlindOneSpawns })
             {
                 foreach (var spawn in spawns)
                 {
@@ -836,6 +917,9 @@ namespace Nuclear.EditorTools
             }
             return false;
         }
+
+        private static bool IsInTunnelSlot(Vector2 point) =>
+            Mathf.Abs(point.x - TunnelX) < TunnelHalfWidth + 3f && point.y > Ridge.yMin - 1f && point.y < Ridge.yMax + 1f;
 
         private static bool IsBlocked(Vector2 point, float margin)
         {
