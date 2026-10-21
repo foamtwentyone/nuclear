@@ -348,7 +348,11 @@ namespace Nuclear.EditorTools
         {
             var mesh = kit.ToOutlineMesh(name + " Outline");
             AssetDatabase.CreateAsset(mesh, AssetDatabase.GenerateUniqueAssetPath($"{MeshFolder}/{name} Outline.asset"));
+            AddOutline(model, mesh);
+        }
 
+        private static void AddOutline(GameObject model, Mesh mesh)
+        {
             var outline = new GameObject("Outline");
             outline.transform.SetParent(model.transform, false);
             outline.isStatic = model.isStatic;

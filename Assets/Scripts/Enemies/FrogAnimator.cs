@@ -5,13 +5,19 @@ namespace Nuclear.Enemies
     /// <summary>
     /// Анимация лягушки у каждого игрока локально: дышит горлом, моргает, перед прыжком приседает,
     /// в полёте вытягивается, при приземлении плюхается и пружинит.
+    /// Веки в префабе стоят закрытыми; открытое веко повёрнуто вверх-назад вокруг центра глаза.
     /// </summary>
     [RequireComponent(typeof(Frog))]
     public class FrogAnimator : MonoBehaviour
     {
+        [Tooltip("На сколько градусов поднято открытое веко (90 — край века по центру глаза).")]
+        [SerializeField] private float openLid = 118f;
+
         private Frog frog;
-        private Transform body, eyes;
-        private Vector3 bodyScale, eyesScale;
+        private Transform body;
+        private readonly Transform[] lids = new Transform[2];
+        private readonly Quaternion[] lidClosed = new Quaternion[2];
+        private Vector3 bodyScale;
         private float stretch, stretchVelocity;
         private float nextBlink, blink;
         private Frog.State lastState;
@@ -20,11 +26,15 @@ namespace Nuclear.Enemies
         {
             frog = GetComponent<Frog>();
             body = transform.Find("Body");
-            eyes = body != null ? body.Find("Eyes") : null;
-            if (body != null)
-                bodyScale = body.localScale;
-            if (eyes != null)
-                eyesScale = eyes.localScale;
+            if (body == null)
+                return;
+            bodyScale = body.localScale;
+            for (int i = 0; i < lids.Length; i++)
+            {
+                lids[i] = body.Find(i == 0 ? "Lid L" : "Lid R");
+                if (lids[i] != null)
+                    lidClosed[i] = lids[i].localRotation;
+            }
         }
 
         private void Update()
@@ -57,16 +67,19 @@ namespace Nuclear.Enemies
             float width = 1f / Mathf.Sqrt(Mathf.Max(0.5f, height));
             body.localScale = Vector3.Scale(bodyScale, new Vector3(width, height, width));
 
-            if (eyes == null)
-                return;
             if (Time.time >= nextBlink)
             {
                 nextBlink = Time.time + Random.Range(2f, 6f);
                 blink = 1f;
             }
             blink = Mathf.MoveTowards(blink, 0f, deltaTime * 6f);
-            float lid = state == Frog.State.Windup ? 0.6f : 1f - Mathf.Sin(blink * Mathf.PI) * 0.9f;
-            eyes.localScale = Vector3.Scale(eyesScale, new Vector3(1f, lid, 1f));
+            // 1 — открыто, 0 — закрыто; перед прыжком лягушка щурится.
+            float open = state == Frog.State.Windup ? 0.55f : 1f - Mathf.Sin(blink * Mathf.PI);
+            for (int i = 0; i < lids.Length; i++)
+            {
+                if (lids[i] != null)
+                    lids[i].localRotation = lidClosed[i] * Quaternion.Euler(-openLid * open, 0f, 0f);
+            }
         }
     }
 }

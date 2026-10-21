@@ -78,18 +78,22 @@ namespace Nuclear.EditorTools
         {
             var root = MobRoot("Frog");
             var sphere = root.AddComponent<SphereCollider>();
-            sphere.center = new Vector3(0f, 0.58f, 0.05f);
-            sphere.radius = 0.62f;
+            sphere.center = new Vector3(0f, 0.5f, 0f);
+            sphere.radius = 0.55f;
 
-            // Тело расписано картинкой-референсом (роспись в цветах вершин), глаза — свои и моргают.
-            var bodyKit = new MeshKit();
-            Models.FrogBody(bodyKit);
-            var body = AddModel(root.transform, "Body", bodyKit, Vector3.zero, Quaternion.identity, PaintedMaterial("Frog"));
-            AddOutline(body, bodyKit, "Frog Body");
-            ProjectReference(body.GetComponent<MeshFilter>().sharedMesh, FrogReference, FrogFront, FrogSide, FrogBack, new Color32(94, 93, 41, 255));
-            var eyesKit = new MeshKit();
-            Models.FrogEyeBalls(eyesKit);
-            AddModel(body.transform, "Eyes", eyesKit, Models.FrogEyes, Quaternion.identity);
+            // Тело — готовая модель из нейросети (глаза на ней нарисованы), поверх глаз — моргающие веки.
+            var body = AddBakedModel(root.transform, "Body", "Frog");
+            if (body != null)
+            {
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    var lidKit = new MeshKit();
+                    Models.FrogLid(lidKit);
+                    var mirror = new Vector3(-side, 1f, 1f);
+                    AddModel(body.transform, side < 0f ? "Lid L" : "Lid R", lidKit, Vector3.Scale(Models.FrogEye, mirror),
+                        Quaternion.LookRotation(Vector3.Scale(Models.FrogGaze, mirror), Vector3.up));
+                }
+            }
 
             root.AddComponent<Frog>();
             root.AddComponent<FrogAnimator>();
