@@ -31,6 +31,7 @@ namespace Nuclear.EditorTools.LowPoly
             Swatch.Fur or Swatch.FurDark or Swatch.FurPale or Swatch.MouthFur or Swatch.MouthFurLight => Surface.Fur,
             Swatch.Skin or Swatch.SkinDark or Swatch.SkinPale or Swatch.NosePink or Swatch.NoseDark or Swatch.Mouth
                 or Swatch.CatfishBack or Swatch.CatfishFin or Swatch.CatfishBelly or Swatch.FrogSkin or Swatch.FrogBelly or Swatch.FrogWart
+                or Swatch.FrogSkinLight or Swatch.FrogLip or Swatch.FrogToe or Swatch.FrogWartBrown or Swatch.FrogEyeRing
                 or Swatch.Lips or Swatch.Gums or Swatch.Throat => Surface.Skin,
             _ => Surface.Plain,
         };

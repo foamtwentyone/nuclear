@@ -78,8 +78,8 @@ namespace Nuclear.EditorTools
         {
             var root = MobRoot("Frog");
             var sphere = root.AddComponent<SphereCollider>();
-            sphere.center = new Vector3(0f, 0.5f, 0f);
-            sphere.radius = 0.55f;
+            sphere.center = new Vector3(0f, 0.58f, 0.05f);
+            sphere.radius = 0.62f;
 
             var bodyKit = new MeshKit();
             Models.FrogBody(bodyKit);

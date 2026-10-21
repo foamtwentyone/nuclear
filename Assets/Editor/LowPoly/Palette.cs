@@ -28,6 +28,7 @@ namespace Nuclear.EditorTools.LowPoly
         CatfishBack, CatfishFin, CatfishBelly,
         FrogSkin, FrogBelly, FrogEye, FrogWart,
         MouthFur, MouthFurLight, Lips, Gums, Throat,
+        FrogSkinLight, FrogLip, FrogToe, FrogWartBrown, FrogEyeRing,
     }
 
     /// <summary>
@@ -59,8 +60,9 @@ namespace Nuclear.EditorTools.LowPoly
             Hex(0x7a6450), Hex(0x47382c), Hex(0xb3a185), Hex(0xc98a86), Hex(0x8c5556), Hex(0xd9c58f),
             // Мобы перехода 1
             Hex(0x33394d), Hex(0xb04d58), Hex(0x8e93a0),
-            Hex(0x5f6a2c), Hex(0xb0a85e), Hex(0xe3c43a), Hex(0x454f22),
+            Hex(0x5e5d29), Hex(0x8f8840), Hex(0xd2bf3a), Hex(0x403f1e),
             Hex(0x6a4a33), Hex(0x8c6a4b), Hex(0xc47c79), Hex(0xa9545c), Hex(0x5a1d22),
+            Hex(0x807936), Hex(0xc98446), Hex(0x8f5824), Hex(0x6e4325), Hex(0x3a2e1a),
         };
 
         /// <summary>
