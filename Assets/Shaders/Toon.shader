@@ -1,6 +1,7 @@
-// Мультяшное освещение для URP в духе Peak и Pratfall: свет ложится несколькими ровными ступенями
-// с мягкими краями, тень слегка окрашена вместо серой, по освещённому силуэту — светлый ободок.
-// По яркости не светлее URP Lit: те же солнце + небо, только ступенями.
+// «Живописное» мультяшное освещение для URP, как на концепт-артах игры: мягкий свет с чуть подчёркнутой
+// границей света и тени, прохладная голубоватая тень, пятна «краски» по поверхности (шум в координатах
+// объекта — пятна едут вместе с мобом), форма темнеет к краю силуэта, как мазок кистью.
+// По яркости не светлее URP Lit: те же солнце + небо.
 // Тени, глубина и нормали для SSAO берутся готовыми проходами из URP Lit.
 Shader "Nuclear/Toon"
 {
@@ -12,12 +13,14 @@ Shader "Nuclear/Toon"
         _BumpScale ("Normal Scale", Float) = 1
         _Smoothness ("Smoothness", Range(0, 1)) = 0.1
 
-        _Steps ("Light steps", Range(1, 6)) = 3
-        _StepSoftness ("Step softness", Range(0.01, 1)) = 0.12
-        _ShadowTint ("Shadow tint", Color) = (0.82, 0.76, 0.95, 1)
+        _Banding ("Terminator emphasis", Range(0, 1)) = 0.45
+        _ShadowTint ("Shadow tint", Color) = (0.8, 0.86, 1, 1)
         _AmbientStrength ("Ambient strength", Range(0, 2)) = 1
+        _Mottle ("Paint mottling", Range(0, 0.5)) = 0.14
+        _MottleScale ("Mottle frequency (per m)", Float) = 2.2
+        _EdgeDarken ("Edge darkening", Range(0, 1)) = 0.3
         _RimColor ("Rim color", Color) = (1, 0.95, 0.85, 1)
-        _RimStrength ("Rim strength", Range(0, 1)) = 0.35
+        _RimStrength ("Rim strength", Range(0, 1)) = 0.2
         _RimWidth ("Rim width", Range(0, 1)) = 0.3
 
         // Нужны проходам, взятым из URP Lit.
@@ -59,9 +62,11 @@ Shader "Nuclear/Toon"
                 half4 _BaseColor;
                 half _BumpScale;
                 half _Smoothness;
-                half _Steps;
-                half _StepSoftness;
+                half _Banding;
                 half4 _ShadowTint;
+                half _Mottle;
+                float _MottleScale;
+                half _EdgeDarken;
                 half _AmbientStrength;
                 half4 _RimColor;
                 half _RimStrength;
@@ -86,6 +91,7 @@ Shader "Nuclear/Toon"
                 half3 normalWS : TEXCOORD2;
                 half4 tangentWS : TEXCOORD3;
                 half fogFactor : TEXCOORD4;
+                float3 positionOS : TEXCOORD5;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -103,25 +109,51 @@ Shader "Nuclear/Toon"
                 output.tangentWS = half4(normal.tangentWS, input.tangentOS.w * GetOddNegativeScale());
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.fogFactor = ComputeFogFactor(position.positionCS.z);
+                output.positionOS = input.positionOS.xyz;
                 return output;
             }
 
-            // Ступенчатая «лесенка» освещённости 0..1 с мягкими краями ступеней.
-            half Ramp(half light)
+            // Мягкий свет с подчёркнутой границей света и тени — как у художника, а не ступенями.
+            half Paint(half light)
             {
-                half steps = max(1.0h, _Steps);
-                half x = saturate(light) * steps;
-                half band = floor(x);
-                half edge = smoothstep(1.0h - _StepSoftness, 1.0h, frac(x));
-                return saturate((band + edge) / steps);
+                light = saturate(light);
+                return lerp(light, smoothstep(0.2h, 0.75h, light), _Banding);
             }
 
-            // Освещённость источником 0..1 ступенями. Немного «обёрнута» за терминатор, чтобы ступени
-            // ложились на форму мягче, но тёмная сторона остаётся тёмной.
+            // Освещённость источником 0..1: «обёрнута» за терминатор, чтобы тень ложилась на форму мягко.
             half ToonDiffuse(Light light, half3 normalWS)
             {
-                half wrapped = saturate((dot(normalWS, light.direction) + 0.15h) / 1.15h);
-                return Ramp(wrapped * light.shadowAttenuation);
+                half wrapped = saturate((dot(normalWS, light.direction) + 0.25h) / 1.25h);
+                return Paint(wrapped * light.shadowAttenuation);
+            }
+
+            float Hash3(float3 p)
+            {
+                p = frac(p * 0.3183099 + 0.1);
+                p *= 17.0;
+                return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
+            }
+
+            float Noise3(float3 x)
+            {
+                float3 i = floor(x);
+                float3 f = frac(x);
+                f = f * f * (3.0 - 2.0 * f);
+                return lerp(lerp(lerp(Hash3(i), Hash3(i + float3(1, 0, 0)), f.x),
+                                 lerp(Hash3(i + float3(0, 1, 0)), Hash3(i + float3(1, 1, 0)), f.x), f.y),
+                            lerp(lerp(Hash3(i + float3(0, 0, 1)), Hash3(i + float3(1, 0, 1)), f.x),
+                                 lerp(Hash3(i + float3(0, 1, 1)), Hash3(i + float3(1, 1, 1)), f.x), f.y), f.z);
+            }
+
+            // Пятна «краски»: светлее-темнее и чуть теплее-холоднее, крупные разводы и мелкие мазки.
+            half3 Mottle(half3 albedo, float3 positionOS)
+            {
+                float3 p = positionOS * _MottleScale;
+                float n = Noise3(p) * 0.6 + Noise3(p * 2.7 + 11.0) * 0.3 + Noise3(p * 7.1 + 3.0) * 0.1 - 0.5;
+                half3 tinted = albedo * (1.0h + (half)n * _Mottle * 2.0h);
+                half3 warm = tinted * half3(1.06h, 1.0h, 0.9h);
+                half3 cool = tinted * half3(0.94h, 0.98h, 1.06h);
+                return lerp(cool, warm, saturate((half)n * 2.0h + 0.5h));
             }
 
             // Блик — одно чёткое пятно, только у гладких поверхностей (металл, стекло, краска).
@@ -138,6 +170,7 @@ Shader "Nuclear/Toon"
                 UNITY_SETUP_INSTANCE_ID(input);
 
                 half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv) * _BaseColor;
+                albedo.rgb = Mottle(albedo.rgb, input.positionOS);
 
                 half3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, input.uv), _BumpScale);
                 half3 bitangent = input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz);
@@ -172,8 +205,11 @@ Shader "Nuclear/Toon"
                 LIGHT_LOOP_END
                 #endif
 
-                // Ободок по силуэту, только на освещённой стороне и неяркий.
+                // Форма темнеет к краю силуэта, как мазок кистью по объёму.
                 half fresnel = 1.0h - saturate(dot(normalWS, viewWS));
+                color *= 1.0h - _EdgeDarken * pow(fresnel, 2.2h);
+
+                // Ободок по силуэту, только на освещённой стороне и неяркий.
                 half rim = smoothstep(1.0h - _RimWidth, 1.0h - _RimWidth + 0.08h, fresnel);
                 color += _RimColor.rgb * mainLight.color * albedo.rgb * rim * mainLit * _RimStrength;
 

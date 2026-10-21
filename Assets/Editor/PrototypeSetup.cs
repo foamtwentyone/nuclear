@@ -207,7 +207,9 @@ namespace Nuclear.EditorTools
             }
             material.shader = shader;
             // Толщина задаётся здесь, а не в инспекторе: материал пересоздаётся при каждой сборке.
-            material.SetFloat("_Width", 0.005f);
+            material.SetFloat("_Width", 0.0035f);
+            // Тёмно-коричневая, а не чёрная: мягче, как линия кистью на концепт-артах.
+            material.SetColor("_Color", new Color(0.17f, 0.12f, 0.1f));
             EditorUtility.SetDirty(material);
             return material;
         }

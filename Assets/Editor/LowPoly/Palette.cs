@@ -24,6 +24,10 @@ namespace Nuclear.EditorTools.LowPoly
         // Слепыш: облезлая шерсть морской свинки, голая кожа, звёздчатый нос, резцы
         Skin, SkinDark, SkinPale, Mouth, Claw,
         Fur, FurDark, FurPale, NosePink, NoseDark, Teeth,
+        // Мобы перехода 1 (по концепт-арту): сом, лягушка, Рот
+        CatfishBack, CatfishFin, CatfishBelly,
+        FrogSkin, FrogBelly, FrogEye, FrogWart,
+        MouthFur, MouthFurLight, Lips, Gums, Throat,
     }
 
     /// <summary>
@@ -47,12 +51,16 @@ namespace Nuclear.EditorTools.LowPoly
             // Разметка и пометки
             Hex(0xc9a227), Hex(0x232220), Hex(0xa8352a), Hex(0xd9d6cf),
             // Выживший
-            Hex(0xb5652e), Hex(0x6e3f22), Hex(0x3f3f40), Hex(0x7a6c52), Hex(0x262626), Hex(0x7fa8a0), Hex(0x2a2420),
+            Hex(0x56613a), Hex(0x3c4430), Hex(0x2f2f30), Hex(0x7a6c52), Hex(0x262626), Hex(0x3e5250), Hex(0x2a2420),
             // Предметы
             Hex(0x5b6340), Hex(0x434a2f), Hex(0xa88a46), Hex(0xa0603a), Hex(0x55575a), Hex(0x2d3238), Hex(0xc8bfa4), Hex(0x9a4a35),
             // Слепыш
             Hex(0xb8a89c), Hex(0x8c7a70), Hex(0xd6c9bd), Hex(0x3a1f1e), Hex(0x2e2a26),
             Hex(0x7a6450), Hex(0x47382c), Hex(0xb3a185), Hex(0xc98a86), Hex(0x8c5556), Hex(0xd9c58f),
+            // Мобы перехода 1
+            Hex(0x33394d), Hex(0xb04d58), Hex(0x8e93a0),
+            Hex(0x5f6a2c), Hex(0xb0a85e), Hex(0xe3c43a), Hex(0x454f22),
+            Hex(0x6a4a33), Hex(0x8c6a4b), Hex(0xc47c79), Hex(0xa9545c), Hex(0x5a1d22),
         };
 
         /// <summary>
@@ -63,7 +71,7 @@ namespace Nuclear.EditorTools.LowPoly
         {
             var c = Colors[(int)swatch];
             float luminance = c.r * 0.3f + c.g * 0.59f + c.b * 0.11f;
-            const float saturation = 1.25f, brightness = 1.08f;
+            const float saturation = 1.08f, brightness = 1.05f;
             return new Color(
                 Mathf.Clamp01((luminance + (c.r - luminance) * saturation) * brightness),
                 Mathf.Clamp01((luminance + (c.g - luminance) * saturation) * brightness),

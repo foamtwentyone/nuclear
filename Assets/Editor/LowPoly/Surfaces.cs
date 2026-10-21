@@ -28,8 +28,10 @@ namespace Nuclear.EditorTools.LowPoly
             Swatch.PaintRed or Swatch.PaintBlue or Swatch.PaintGreen or Swatch.PaintBeige or Swatch.RoadLine
                 or Swatch.HazardYellow or Swatch.HazardBlack or Swatch.SignalRed or Swatch.FilterOlive or Swatch.FilterOliveDark or Swatch.CanLabel => Surface.Paint,
             Swatch.Jacket or Swatch.JacketDark or Swatch.Trousers or Swatch.Canvas or Swatch.Boots => Surface.Fabric,
-            Swatch.Fur or Swatch.FurDark or Swatch.FurPale => Surface.Fur,
-            Swatch.Skin or Swatch.SkinDark or Swatch.SkinPale or Swatch.NosePink or Swatch.NoseDark or Swatch.Mouth => Surface.Skin,
+            Swatch.Fur or Swatch.FurDark or Swatch.FurPale or Swatch.MouthFur or Swatch.MouthFurLight => Surface.Fur,
+            Swatch.Skin or Swatch.SkinDark or Swatch.SkinPale or Swatch.NosePink or Swatch.NoseDark or Swatch.Mouth
+                or Swatch.CatfishBack or Swatch.CatfishFin or Swatch.CatfishBelly or Swatch.FrogSkin or Swatch.FrogBelly or Swatch.FrogWart
+                or Swatch.Lips or Swatch.Gums or Swatch.Throat => Surface.Skin,
             _ => Surface.Plain,
         };
 
@@ -56,7 +58,8 @@ namespace Nuclear.EditorTools.LowPoly
         public static float Smoothness(Swatch swatch) => swatch switch
         {
             Swatch.Glass or Swatch.Lens => 0.6f,
-            Swatch.NosePink or Swatch.Mouth => 0.35f,
+            Swatch.NosePink or Swatch.Mouth or Swatch.Gums or Swatch.Throat or Swatch.Lips => 0.35f,
+            Swatch.FrogEye or Swatch.FrogSkin => 0.3f,
             _ => Of(swatch) == Surface.Metal ? 0.3f : 0.05f,
         };
 

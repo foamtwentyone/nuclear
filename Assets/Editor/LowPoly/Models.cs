@@ -17,8 +17,8 @@ namespace Nuclear.EditorTools.LowPoly
         public static readonly Vector3 SurvivorHand = new(0.3f, 0.2f, 0.38f);
 
         /// <summary>
-        /// Выживший в противогазе, вылепленный цельной мягкой формой, как Слепыш: большая голова в капюшоне,
-        /// маска с огромными круглыми окулярами и фильтром-хоботком, пухлая куртка, перчатки, рюкзак со скаткой.
+        /// Выживший в противогазе (по концепт-арту): оливковая куртка с капюшоном, чёрная резиновая маска
+        /// с круглыми окулярами и фильтром, тёмные штаны, перчатки, рюкзак со скаткой. Цельная мягкая форма.
         /// Правая рука вытянута вперёд — в ней предмет. Опорная точка — таз (тело падает вокруг неё при смерти).
         /// </summary>
         public static void Survivor(MeshKit k)
@@ -52,22 +52,22 @@ namespace Nuclear.EditorTools.LowPoly
 
             // Воротник и большая голова в капюшоне.
             sdf.Ellipsoid(new Vector3(0f, 0.62f, -0.02f), new Vector3(0.21f, 0.09f, 0.18f), 0.08f, Swatch.JacketDark);
-            sdf.Ellipsoid(new Vector3(0f, 0.87f, -0.05f), new Vector3(0.27f, 0.28f, 0.25f), 0.06f, Swatch.JacketDark);
+            sdf.Ellipsoid(new Vector3(0f, 0.84f, -0.04f), new Vector3(0.22f, 0.23f, 0.21f), 0.06f, Swatch.JacketDark);
             // Резиновая маска выступает из капюшона спереди.
-            sdf.Ellipsoid(new Vector3(0f, 0.83f, 0.08f), new Vector3(0.205f, 0.215f, 0.17f), 0.03f, Swatch.Rubber);
+            sdf.Ellipsoid(new Vector3(0f, 0.81f, 0.06f), new Vector3(0.17f, 0.18f, 0.15f), 0.03f, Swatch.Rubber);
 
             foreach (float side in new[] { -1f, 1f })
             {
                 // Окуляры — плоские металлические кольца, из которых выпукло выступает стекло.
-                var eye = new Vector3(0.095f * side, 0.88f, 0.235f);
-                sdf.Ellipsoid(eye, new Vector3(0.068f, 0.068f, 0.032f), 0.012f, Swatch.Metal);
-                sdf.Ellipsoid(eye + new Vector3(0f, 0f, 0.016f), new Vector3(0.05f, 0.05f, 0.03f), 0f, Swatch.Lens);
+                var eye = new Vector3(0.075f * side, 0.85f, 0.2f);
+                sdf.Ellipsoid(eye, new Vector3(0.055f, 0.055f, 0.03f), 0.012f, Swatch.Metal);
+                sdf.Ellipsoid(eye + new Vector3(0f, 0f, 0.014f), new Vector3(0.04f, 0.04f, 0.028f), 0f, Swatch.Lens);
             }
 
             // Хоботок: резиновый клапан и оливковая банка фильтра на конце.
-            sdf.RoundCone(new Vector3(0f, 0.75f, 0.2f), new Vector3(0f, 0.68f, 0.29f), 0.07f, 0.06f, 0.03f, Swatch.Rubber);
-            sdf.RoundCone(new Vector3(0f, 0.67f, 0.3f), new Vector3(0f, 0.63f, 0.38f), 0.085f, 0.085f, 0.015f, Swatch.FilterOlive);
-            sdf.Ellipsoid(new Vector3(0f, 0.625f, 0.405f), new Vector3(0.06f, 0.06f, 0.02f), 0.005f, Swatch.FilterOliveDark);
+            sdf.RoundCone(new Vector3(0f, 0.74f, 0.17f), new Vector3(0f, 0.68f, 0.25f), 0.06f, 0.05f, 0.03f, Swatch.Rubber);
+            sdf.RoundCone(new Vector3(0f, 0.67f, 0.26f), new Vector3(0f, 0.64f, 0.32f), 0.07f, 0.07f, 0.015f, Swatch.FilterOlive);
+            sdf.Ellipsoid(new Vector3(0f, 0.635f, 0.345f), new Vector3(0.05f, 0.05f, 0.018f), 0.005f, Swatch.FilterOliveDark);
 
             // Рюкзак со скаткой — мягкий, но заметно отдельный.
             sdf.RoundBox(new Vector3(0f, 0.36f, -0.28f), new Vector3(0.2f, 0.24f, 0.1f), Quaternion.identity, 0.07f, 0.04f, Swatch.Canvas);
