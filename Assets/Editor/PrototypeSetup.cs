@@ -85,6 +85,9 @@ namespace Nuclear.EditorTools
                 BlindOne = BuildBlindOnePrefab(),
                 Door = BuildDoorPrefab(),
             };
+            items.Catfish = BuildCatfishPrefab();
+            items.Frog = BuildFrogPrefab();
+            items.Mouth = BuildMouthPrefab();
             items.Hoods = new GameObject[HoodCars.Length];
             for (int i = 0; i < HoodCars.Length; i++)
                 items.Hoods[i] = BuildCarHoodPrefab(HoodCars[i].Paint, HoodCars[i].Seed, items, gear);
@@ -104,6 +107,9 @@ namespace Nuclear.EditorTools
             public GameObject Door;
             public GearPrefabs Gear;
             public GameObject[] Hoods;
+            public GameObject Catfish;
+            public GameObject Frog;
+            public GameObject Mouth;
         }
 
         private struct GearPrefabs

@@ -71,6 +71,9 @@ namespace Nuclear.EditorTools
         private static readonly Vector3[] FlashlightBatterySpawns = { new(12f, 0.2f, 33f), new(-12f, 0.2f, 54f), new(24f, 0.2f, 62f), new(32f, 0.2f, 90f), new(-20f, 0.2f, 150f) };
         // Слепыш на трассе и второй — у Бункера-12: шум открывающейся двери его точно приведёт.
         private static readonly Vector3[] BlindOneSpawns = { new(-12f, 0f, 77f), new(12f, 0f, 79f), new(0f, 0f, 83f) };
+        // Лягушки сидят у прудов; Рты прикидываются камнями у лута (в посёлке, у дома при трассе, в тоннеле у бинта).
+        private static readonly Vector3[] FrogSpawns = { new(-19.3f, 0f, 40f), new(21.1f, 0f, 30f) };
+        private static readonly Vector3[] MouthSpawns = { new(11.3f, 0f, 46.8f), new(-30.2f, 0f, 74.6f), new(TunnelX + 1.8f, 0.06f, 108.5f) };
         private static readonly Vector3[] FinaleBlindOneSpawns = { new(-12f, 0f, 168f), new(13f, 0f, 170f) };
 
         /// <summary>Занятые места: прямоугольники построек и круги вокруг важных точек.</summary>
@@ -106,7 +109,7 @@ namespace Nuclear.EditorTools
             manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
             manager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(SaveNetworkPrefabs(items.Battery, items.Crate, items.Can, items.Filter, items.BlindOne, items.Door,
                 items.Gear.Bandage, items.Gear.Flashlight, items.Gear.Crowbar, items.Gear.Battery,
-                items.Hoods[0], items.Hoods[1], items.Hoods[2]));
+                items.Hoods[0], items.Hoods[1], items.Hoods[2], items.Catfish, items.Frog, items.Mouth));
             networkObject.AddComponent<ConnectionMenu>();
 
             BuildSpawner(items);
@@ -139,6 +142,10 @@ namespace Nuclear.EditorTools
                 // Слепыш начинает в дальней части карты, подальше от шлюза.
                 new ItemSpawner.Entry { prefab = items.BlindOne, positions = BlindOneSpawns, count = 1 },
                 new ItemSpawner.Entry { prefab = items.BlindOne, positions = FinaleBlindOneSpawns, count = 1 },
+                // Сом лежит в тоннеле мордой к входу, усы поперёк прохода.
+                new ItemSpawner.Entry { prefab = items.Catfish, positions = new[] { new Vector3(TunnelX, 0.06f, 134f) }, yaws = new[] { 180f }, count = 1 },
+                new ItemSpawner.Entry { prefab = items.Frog, positions = FrogSpawns, yaws = new[] { 90f, 270f }, count = FrogSpawns.Length },
+                new ItemSpawner.Entry { prefab = items.Mouth, positions = MouthSpawns, yaws = new[] { 270f, 150f, 270f }, count = MouthSpawns.Length },
                 new ItemSpawner.Entry { prefab = items.Door, positions = new[] { DoorPosition }, count = 1, randomYaw = false },
                 new ItemSpawner.Entry { prefab = items.Hoods[0], positions = new[] { OnGround(HoodCars[0].Position.x, HoodCars[0].Position.y) }, yaws = new[] { HoodCars[0].Yaw }, count = 1 },
                 new ItemSpawner.Entry { prefab = items.Hoods[1], positions = new[] { OnGround(HoodCars[1].Position.x, HoodCars[1].Position.y) }, yaws = new[] { HoodCars[1].Yaw }, count = 1 },
@@ -189,7 +196,7 @@ namespace Nuclear.EditorTools
         {
             blockedRects.Clear();
             blockedCircles.Clear();
-            foreach (var spawns in new[] { CrateSpawns, CanSpawns, FilterSpawns, BandageSpawns, FlashlightBatterySpawns, BlindOneSpawns, FinaleBlindOneSpawns })
+            foreach (var spawns in new[] { CrateSpawns, CanSpawns, FilterSpawns, BandageSpawns, FlashlightBatterySpawns, BlindOneSpawns, FinaleBlindOneSpawns, FrogSpawns, MouthSpawns })
             {
                 foreach (var point in spawns)
                     blockedCircles.Add(new Vector3(point.x, point.z, 1.8f));

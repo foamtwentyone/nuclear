@@ -20,6 +20,7 @@ namespace Nuclear.Audio
         private static AudioClip rumble, doorAlarm, doorClunk;
         private static AudioClip blindPurr, sniff, scream, bite, chatter, hitFlesh, heavyStep;
         private static AudioClip victory, defeat;
+        private static AudioClip croak, gulp, burp;
         private static readonly AudioClip[] footsteps = new AudioClip[FootstepVariants];
 
         // Игрок
@@ -62,6 +63,11 @@ namespace Nuclear.Audio
         public static AudioClip Chatter => Cached(ref chatter, MakeChatter);
         public static AudioClip HitFlesh => Cached(ref hitFlesh, MakeHitFlesh);
         public static AudioClip HeavyStep => Cached(ref heavyStep, MakeHeavyStep);
+
+        // Мобы
+        public static AudioClip Croak => Cached(ref croak, MakeCroak);
+        public static AudioClip Gulp => Cached(ref gulp, MakeGulp);
+        public static AudioClip Burp => Cached(ref burp, MakeBurp);
 
         // Итог уровня
         public static AudioClip Victory => Cached(ref victory, () => MakePad("Victory", new[] { 220f, 277.18f, 329.63f, 493.88f, 659.25f }, opening: true));
@@ -570,6 +576,67 @@ namespace Nuclear.Audio
                 AddModes(data, start, new[] { 2600f, 3900f }, new[] { 1f, 0.6f }, new[] { 0.008f, 0.005f }, 1f - c * 0.08f, random);
             }
             return ToClip("Chatter", Reverb(data, 0.3f, 0.5f, 0.1f), 0.7f);
+        }
+
+        /// <summary>«Ква-ква» огромной лягушки: два хриплых толчка — низкая пила, рваная пульсами, через «горловые» форманты.</summary>
+        private static AudioClip MakeCroak()
+        {
+            var saw = new Saw();
+            var data = Buffer(0.6f);
+            var throat = Biquad.BandPass(450f, 2f);
+            var mouth = Biquad.BandPass(1100f, 3f);
+            foreach (var (start, pitch) in new[] { (0f, 1f), (0.24f, 0.88f) })
+            {
+                for (int i = Mathf.RoundToInt(start * SampleRate); i < data.Length; i++)
+                {
+                    float local = TimeAt(i) - start;
+                    if (local > 0.18f)
+                        break;
+                    float frequency = (115f - 40f * local) * pitch;
+                    // Хрип: голос рвётся на импульсы ~32 раза в секунду.
+                    float rattle = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(2f * Mathf.PI * 32f * local)), 3f);
+                    float voice = saw.Next(frequency) * (0.35f + 0.65f * rattle) * Window(local, 0f, 0.18f);
+                    data[i] += throat.Process(voice) * 2.2f + mouth.Process(voice) * 0.9f;
+                }
+            }
+            return ToClip("Croak", Reverb(data, 0.3f, 0.4f, 0.08f), 0.85f);
+        }
+
+        /// <summary>Глоток: мокрый щелчок и проваливающийся вниз низкий тон.</summary>
+        private static AudioClip MakeGulp()
+        {
+            var noise = new PinkNoise(31);
+            var data = Buffer(0.4f);
+            var wet = Biquad.BandPass(900f, 3f);
+            double phase = 0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                float t = TimeAt(i);
+                float frequency = Mathf.Lerp(190f, 60f, Mathf.Clamp01(t / 0.25f));
+                phase += frequency / SampleRate;
+                data[i] = Sine(phase) * Hit(t, 0.02f, 0.01f, 0.12f) * 0.9f + wet.Process(noise.Next()) * Hit(t, 0f, 0.002f, 0.03f) * 3f;
+            }
+            return ToClip("Gulp", data, 0.8f);
+        }
+
+        /// <summary>Отрыжка: низкая дрожащая пила через «рот», нарастает и стихает.</summary>
+        private static AudioClip MakeBurp()
+        {
+            var saw = new Saw();
+            var random = new System.Random(33);
+            var data = Buffer(0.8f);
+            var mouth = Biquad.BandPass(380f, 1.5f);
+            var nasal = Biquad.BandPass(950f, 3f);
+            float jitter = 0f;
+            for (int i = 0; i < data.Length; i++)
+            {
+                float t = TimeAt(i);
+                if (i % 200 == 0)
+                    jitter = White(random) * 8f;
+                float voice = saw.Next(72f + jitter - 12f * t) * Window(t, 0.02f, 0.7f);
+                data[i] = mouth.Process(voice) * 2.5f + nasal.Process(voice) * 0.6f;
+            }
+            return ToClip("Burp", Reverb(data, 0.25f, 0.4f, 0.1f), 0.85f);
         }
 
         /// <summary>Попадание по игроку: глухой удар и хруст.</summary>

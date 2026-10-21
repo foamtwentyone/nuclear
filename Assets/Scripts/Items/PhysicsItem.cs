@@ -125,6 +125,35 @@ namespace Nuclear.Items
                 body.AddForce(carrier.Controller.LookDirection * throwImpulse, ForceMode.Impulse);
         }
 
+        /// <summary>Сервер: выбить предмет из рук всех, кто его несёт.</summary>
+        public void ForceDrop() => ReleaseAll();
+
+        /// <summary>Сервер: предмет проглочен — выпадает из рук и неподвижно прячется (например, под землю).</summary>
+        public void Swallow(Vector3 hiddenPosition)
+        {
+            ReleaseAll();
+            body.isKinematic = true;
+            Teleport(hiddenPosition);
+        }
+
+        /// <summary>Сервер: проглоченный предмет вылетает обратно.</summary>
+        public void SpitOut(Vector3 position, Vector3 velocity)
+        {
+            Teleport(position);
+            body.isKinematic = false;
+            body.linearVelocity = velocity;
+        }
+
+        private void Teleport(Vector3 position)
+        {
+            // Телепорт, а не перемещение: иначе у клиентов предмет «проедет» сквозь землю.
+            if (TryGetComponent(out Unity.Netcode.Components.NetworkTransform network) && network.IsSpawned)
+                network.Teleport(position, transform.rotation, transform.localScale);
+            else
+                transform.position = position;
+            body.position = position;
+        }
+
         private void ReleaseAll()
         {
             for (int i = carriers.Count - 1; i >= 0; i--)

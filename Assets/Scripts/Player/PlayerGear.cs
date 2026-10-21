@@ -346,7 +346,7 @@ namespace Nuclear.Player
             {
                 GearKind.Bandage => LookingAtTeammate ? "перевязать товарища" : "перевязать себя",
                 GearKind.Flashlight => FlashlightOn && LightSlot.Value == Selected ? "выключить фонарь" : "включить фонарь",
-                GearKind.Crowbar => "ударить Слепыша (оглушит, лом сломается)",
+                GearKind.Crowbar => "ударить (Слепыша оглушит, Рот выплюнет)",
                 GearKind.Filter => "сменить фильтр противогаза",
                 GearKind.FlashlightBattery => IndexOf(GearKind.Flashlight) >= 0 ? "вставить в фонарь" : null,
                 _ => null,
@@ -378,6 +378,23 @@ namespace Nuclear.Player
             var instance = Spawn(slot, origin);
             if (instance != null && instance.TryGetComponent(out Rigidbody body))
                 body.AddForce(controller.LookDirection * (slot.Kind == GearKind.Can ? canThrowSpeed : dropSpeed) + Vector3.up * 1.5f, ForceMode.VelocityChange);
+        }
+
+        /// <summary>Есть ли что-то в руке (выбранная ячейка не пуста) — для мобов, ворующих предметы.</summary>
+        public bool HoldsSomething => Slot(Mathf.Clamp(HeldSlot.Value, 0, SlotCount - 1)).Value.Filled;
+
+        /// <summary>
+        /// Сервер: забрать предмет из руки и превратить в настоящий предмет мира в точке position
+        /// (его потом прячет, например, Рот). Возвращает созданный предмет или null.
+        /// </summary>
+        public GameObject TakeHeld(Vector3 position)
+        {
+            int index = Mathf.Clamp(HeldSlot.Value, 0, SlotCount - 1);
+            var slot = Slot(index).Value;
+            if (!slot.Filled)
+                return null;
+            Clear(index);
+            return Spawn(slot, position);
         }
 
         // ---------- Бинт ----------
@@ -554,6 +571,17 @@ namespace Nuclear.Player
                 blindOne.Stun(stunTime);
                 Clear(index);
                 CrowbarHitRpc(point);
+                return;
+            }
+
+            // Рот от удара выплёвывает проглоченное; лом при этом цел.
+            foreach (var mouth in FindObjectsByType<Mouth>(FindObjectsSortMode.None))
+            {
+                var toMouth = mouth.BodyCenter - origin;
+                if (toMouth.magnitude > crowbarReach + 0.6f || Vector3.Dot(direction, toMouth.normalized) < 0.3f)
+                    continue;
+                mouth.Bonk();
+                CrowbarHitRpc(mouth.BodyCenter);
                 return;
             }
         }

@@ -9,7 +9,7 @@ namespace Nuclear.EditorTools.LowPoly
     /// в своих локальных координатах; ставить модель на место — забота вызывающего.
     /// Все случайности — через переданный System.Random, чтобы сборка была повторяемой.
     /// </summary>
-    public static class Models
+    public static partial class Models
     {
         // ---------- Персонажи ----------
 
