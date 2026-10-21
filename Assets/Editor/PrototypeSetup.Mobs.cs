@@ -85,13 +85,12 @@ namespace Nuclear.EditorTools
             var body = AddBakedModel(root.transform, "Body", "Frog");
             if (body != null)
             {
-                foreach (float side in new[] { -1f, 1f })
+                for (int i = 0; i < Models.FrogEyes.Length; i++)
                 {
                     var lidKit = new MeshKit();
                     Models.FrogLid(lidKit);
-                    var mirror = new Vector3(-side, 1f, 1f);
-                    AddModel(body.transform, side < 0f ? "Lid L" : "Lid R", lidKit, Vector3.Scale(Models.FrogEye, mirror),
-                        Quaternion.LookRotation(Vector3.Scale(Models.FrogGaze, mirror), Vector3.up));
+                    AddModel(body.transform, i == 0 ? "Lid L" : "Lid R", lidKit, Models.FrogEyes[i],
+                        Quaternion.LookRotation(Models.FrogEyeAxes[i], Vector3.up), scale: Models.FrogLidScales[i]);
                 }
             }
 

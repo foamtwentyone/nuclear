@@ -56,23 +56,27 @@ namespace Nuclear.EditorTools.LowPoly
 
         // ---------- Лягушка ----------
         // Тело — готовая модель (Assets/Art/Models/Frog, см. Tools/bake_model.py), глаза на ней нарисованы.
-        // Моргают отдельные веки: полусферы чуть больше глазного яблока, поворачиваются вокруг его центра.
+        // Моргают отдельные веки: толстые колпачки чуть больше глазного яблока, поворачиваются вокруг его центра.
+        // Модель несимметрична, поэтому у каждого глаза свои центр, направление и размер (замерены по модели).
 
-        /// <summary>Центр левого глаза на модели лягушки (правый — зеркально по X) и куда он смотрит.</summary>
-        public static readonly Vector3 FrogEye = new(-0.25f, 0.76f, 0.43f);
-        public static readonly Vector3 FrogGaze = new(-0.35f, 0.3f, 0.89f);
+        /// <summary>Центры глаз на модели лягушки (левый, правый).</summary>
+        public static readonly Vector3[] FrogEyes = { new(-0.254f, 0.773f, 0.444f), new(0.248f, 0.754f, 0.415f) };
+        /// <summary>Куда смотрит видимая часть каждого глаза — ось закрытого века.</summary>
+        public static readonly Vector3[] FrogEyeAxes = { new(-0.38f, 0.44f, 0.82f), new(0.86f, 0.27f, 0.44f) };
+        /// <summary>Масштаб века под размер глаза (правый глаз крупнее).</summary>
+        public static readonly float[] FrogLidScales = { 0.99f, 1.15f };
 
         /// <summary>
-        /// Веко: толстая полусфера выпуклостью к +Z, край в плоскости XY через центр глаза.
-        /// Закрыто — смотрит вдоль взгляда; открыто — повёрнуто вверх-назад и прячется под кожей.
+        /// Веко: колпачок выпуклостью к +Z, накрывает глаз на 100° от оси — чуть больше полусферы,
+        /// чтобы закрыть и край глаза у кожи. Закрыто — ось вдоль глаза; открыто — развёрнуто назад, внутрь головы.
         /// </summary>
         public static void FrogLid(MeshKit k)
         {
-            const float outer = 0.098f, inner = 0.088f;
-            const int rings = 6, sides = 14;
+            const float outer = 0.098f, inner = 0.088f, extent = 100f;
+            const int rings = 7, sides = 14;
             Vector3 Point(float radius, int ring, int side)
             {
-                float polar = Mathf.PI * 0.5f * ring / rings;
+                float polar = extent * Mathf.Deg2Rad * ring / rings;
                 float azimuth = Mathf.PI * 2f * side / sides;
                 return radius * new Vector3(Mathf.Sin(polar) * Mathf.Cos(azimuth), Mathf.Sin(polar) * Mathf.Sin(azimuth), Mathf.Cos(polar));
             }
