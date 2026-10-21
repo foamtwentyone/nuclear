@@ -19,6 +19,7 @@ Shader "Nuclear/Toon"
         _Mottle ("Paint mottling", Range(0, 0.5)) = 0.14
         _MottleScale ("Mottle frequency (per m)", Float) = 2.2
         _EdgeDarken ("Edge darkening", Range(0, 1)) = 0.3
+        [Toggle] _VertexColors ("Multiply by vertex colors (painted models)", Float) = 0
         _RimColor ("Rim color", Color) = (1, 0.95, 0.85, 1)
         _RimStrength ("Rim strength", Range(0, 1)) = 0.2
         _RimWidth ("Rim width", Range(0, 1)) = 0.3
@@ -67,6 +68,7 @@ Shader "Nuclear/Toon"
                 half _Mottle;
                 float _MottleScale;
                 half _EdgeDarken;
+                half _VertexColors;
                 half _AmbientStrength;
                 half4 _RimColor;
                 half _RimStrength;
@@ -80,6 +82,7 @@ Shader "Nuclear/Toon"
                 float3 normalOS : NORMAL;
                 float4 tangentOS : TANGENT;
                 float2 uv : TEXCOORD0;
+                half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -92,6 +95,7 @@ Shader "Nuclear/Toon"
                 half4 tangentWS : TEXCOORD3;
                 half fogFactor : TEXCOORD4;
                 float3 positionOS : TEXCOORD5;
+                half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -110,6 +114,7 @@ Shader "Nuclear/Toon"
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.fogFactor = ComputeFogFactor(position.positionCS.z);
                 output.positionOS = input.positionOS.xyz;
+                output.color = input.color;
                 return output;
             }
 
@@ -170,6 +175,8 @@ Shader "Nuclear/Toon"
                 UNITY_SETUP_INSTANCE_ID(input);
 
                 half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv) * _BaseColor;
+                // Расписанные модели (роспись референса в цветах вершин) берут цвет из вершин.
+                albedo.rgb *= lerp(half3(1.0h, 1.0h, 1.0h), input.color.rgb, _VertexColors);
                 albedo.rgb = Mottle(albedo.rgb, input.positionOS);
 
                 half3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, input.uv), _BumpScale);

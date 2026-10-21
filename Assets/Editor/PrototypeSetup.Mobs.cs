@@ -81,9 +81,12 @@ namespace Nuclear.EditorTools
             sphere.center = new Vector3(0f, 0.58f, 0.05f);
             sphere.radius = 0.62f;
 
+            // Тело расписано картинкой-референсом (роспись в цветах вершин), глаза — свои и моргают.
             var bodyKit = new MeshKit();
             Models.FrogBody(bodyKit);
-            var body = AddModel(root.transform, "Body", bodyKit, Vector3.zero, Quaternion.identity);
+            var body = AddModel(root.transform, "Body", bodyKit, Vector3.zero, Quaternion.identity, PaintedMaterial("Frog"));
+            AddOutline(body, bodyKit, "Frog Body");
+            ProjectReference(body.GetComponent<MeshFilter>().sharedMesh, FrogReference, FrogFront, FrogSide, FrogBack, new Color32(94, 93, 41, 255));
             var eyesKit = new MeshKit();
             Models.FrogEyeBalls(eyesKit);
             AddModel(body.transform, "Eyes", eyesKit, Models.FrogEyes, Quaternion.identity);
